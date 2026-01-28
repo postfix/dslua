@@ -2,7 +2,7 @@
 
 DSPy for Lua - LLM orchestration framework with composable modules, agents, and optimizers.
 
-**Status:** ✅ Phase 2 Complete - HTTP Integration and Advanced Modules
+**Status:** ✅ Phase 3 Complete - ReAct Agent Framework
 
 This is a Lua port of [DSPy-Go](https://github.com/postfix/dspy-go), bringing systematic prompt engineering and automated reasoning capabilities to Lua applications through LuaJIT 2.1+.
 
@@ -10,7 +10,7 @@ This is a Lua port of [DSPy-Go](https://github.com/postfix/dspy-go), bringing sy
 
 dslua is a native Lua implementation of the DSPy framework for building reliable LLM applications. Use composable modules and workflows to orchestrate LLM calls with minimal overhead.
 
-## Current Status (Phase 2 Complete)
+## Current Status (Phase 3 Complete)
 
 ✅ **Implemented:**
 - Core abstractions: Field, Signature, Context, Module base
@@ -18,17 +18,19 @@ dslua is a native Lua implementation of the DSPy framework for building reliable
 - ChainOfThought module with reasoning extraction
 - ReAct module with tool use and iteration
 - Refine module with self-critique
-- Tool system for extensible execution
+- **ReActAgent Framework** with enhanced context and retry logic
+- **Tool Registry** for centralized tool management
+- **Built-in tools** (Calculator, StringHelper, SearchTool)
 - HTTP client integration (lua-http + dkjson)
 - OpenAI provider with real API calls
 - Anthropic provider (Claude API)
 - Gemini provider (Google API)
 - Ollama provider for local testing
-- 59 tests passing (100% pass rate)
+- **125 tests passing** (100% pass rate)
 
 🚧 **In Progress:**
-- Advanced agent frameworks
-- Optimizers (MIPRO, BootstrapFewShot, etc.)
+- Advanced optimizers (MIPRO, BootstrapFewShot, etc.)
+- ACE framework with learning
 
 ## Quick Start
 
@@ -66,6 +68,59 @@ print(result.answer)     -- "42"
 print(result.reasoning)  -- Step-by-step reasoning
 ```
 
+### Using ReActAgent with Tools
+
+```lua
+local dslua = require("dslua")
+
+-- Create tool registry and register tools
+local registry = dslua.ToolRegistry.new()
+
+-- Add built-in calculator tool
+local Calculator = require("dslua.tools.builtin.calculator")
+registry:Register("calculator", Calculator.new(), {
+    description = "Performs arithmetic operations",
+    category = "basic"
+})
+
+-- Create ReActAgent
+local agent = dslua.ReActAgent.new(signature, {
+    tool_registry = registry,
+    max_iterations = 10,
+    output_mode = "structured"
+})
+
+agent:WithLLM(llm)
+
+-- Execute with tool use
+local result = agent:Execute(ctx, "Calculate (15+27)*2")
+
+print(result.answer)         -- "84"
+print(result.tool_usage)     -- {calculator = 3}
+print(result.iterations)     -- 4
+print(result.summary)        -- Conversation summary
+```
+
+### Creating Custom Tools
+
+```lua
+local Tool = require("dslua.tools.base")
+
+local weather_tool = Tool.new("weather", {
+    description = "Get current weather for a city",
+    func = function(args)
+        -- Implement weather lookup
+        return string.format("Weather in %s: 22°C, Sunny", args.city)
+    end
+})
+
+registry:Register("weather", weather_tool, {
+    description = "Get weather information",
+    category = "utility",
+    parameters = {"city"}
+})
+```
+
 ### CLI
 
 ```bash
@@ -86,7 +141,7 @@ print(result.reasoning)  -- Step-by-step reasoning
 
 - [x] Phase 1: Core abstractions (Field, Signature, Context, Module, Predict)
 - [x] Phase 2: HTTP Integration and Advanced Modules
-- [ ] Phase 3: Agents and Advanced Features
+- [x] Phase 3: ReAct Agent Framework with Tool Registry
 - [ ] Phase 4: Optimizers
 
 See [DESIGN.md](DESIGN.md) for detailed implementation phases.

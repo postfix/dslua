@@ -13,6 +13,11 @@ M.Refine = require("dslua.modules.refine")
 
 -- Tools
 M.Tool = require("dslua.tools.base")
+M.ToolRegistry = require("dslua.tools.registry")
+
+-- Agents
+M.BaseAgent = require("dslua.agents.base")
+M.ReActAgent = require("dslua.agents.react_agent")
 
 -- LLM providers
 M.llms = require("dslua.llms")

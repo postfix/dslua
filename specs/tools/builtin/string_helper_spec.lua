@@ -1,0 +1,57 @@
+describe("StringHelper Tool", function()
+    local StringHelper
+
+    setup(function()
+        StringHelper = require("dslua.tools.builtin.string_helper")
+    end)
+
+    it("should create string helper", function()
+        local helper = StringHelper.new()
+        assert.is.equal("string_helper", helper:Name())
+        assert.is.equal("Performs string operations: length, uppercase, lowercase, trim, reverse", helper:Description())
+    end)
+
+    it("should get string length", function()
+        local helper = StringHelper.new()
+        local result = helper:Execute({operation = "length", text = "Hello, World!"})
+        assert.is.equal(13, result)
+    end)
+
+    it("should convert to uppercase", function()
+        local helper = StringHelper.new()
+        local result = helper:Execute({operation = "uppercase", text = "hello"})
+        assert.is.equal("HELLO", result)
+    end)
+
+    it("should convert to lowercase", function()
+        local helper = StringHelper.new()
+        local result = helper:Execute({operation = "lowercase", text = "HELLO"})
+        assert.is.equal("hello", result)
+    end)
+
+    it("should trim whitespace", function()
+        local helper = StringHelper.new()
+        local result = helper:Execute({operation = "trim", text = "  hello  "})
+        assert.is.equal("hello", result)
+    end)
+
+    it("should reverse string", function()
+        local helper = StringHelper.new()
+        local result = helper:Execute({operation = "reverse", text = "hello"})
+        assert.is.equal("olleh", result)
+    end)
+
+    it("should throw error for unknown operation", function()
+        local helper = StringHelper.new()
+        assert.has_error(function()
+            helper:Execute({operation = "unknown", text = "test"})
+        end, "Unknown operation: unknown")
+    end)
+
+    it("should throw error when missing parameters", function()
+        local helper = StringHelper.new()
+        assert.has_error(function()
+            helper:Execute({operation = "length"})
+        end)
+    end)
+end)
