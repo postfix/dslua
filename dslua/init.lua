@@ -7,6 +7,12 @@ M.Context = require("dslua.core.context")
 
 -- Modules
 M.Predict = require("dslua.modules.predict")
+M.ChainOfThought = require("dslua.modules.chain_of_thought")
+M.ReAct = require("dslua.modules.react")
+M.Refine = require("dslua.modules.refine")
+
+-- Tools
+M.Tool = require("dslua.tools.base")
 
 -- LLM providers
 M.llms = require("dslua.llms")
