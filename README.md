@@ -2,7 +2,7 @@
 
 DSPy for Lua - LLM orchestration framework with composable modules, agents, and optimizers.
 
-**Status:** 🚧 Under Active Development (Phase 1)
+**Status:** ✅ Phase 2 Complete - HTTP Integration and Advanced Modules
 
 This is a Lua port of [DSPy-Go](https://github.com/postfix/dspy-go), bringing systematic prompt engineering and automated reasoning capabilities to Lua applications through LuaJIT 2.1+.
 
@@ -10,17 +10,25 @@ This is a Lua port of [DSPy-Go](https://github.com/postfix/dspy-go), bringing sy
 
 dslua is a native Lua implementation of the DSPy framework for building reliable LLM applications. Use composable modules and workflows to orchestrate LLM calls with minimal overhead.
 
-## Current Status (Phase 1)
+## Current Status (Phase 2 Complete)
 
 ✅ **Implemented:**
 - Core abstractions: Field, Signature, Context, Module base
 - Predict module for direct LLM prediction
-- OpenAI provider structure (HTTP integration pending)
+- ChainOfThought module with reasoning extraction
+- ReAct module with tool use and iteration
+- Refine module with self-critique
+- Tool system for extensible execution
+- HTTP client integration (lua-http + dkjson)
+- OpenAI provider with real API calls
+- Anthropic provider (Claude API)
+- Gemini provider (Google API)
+- Ollama provider for local testing
+- 59 tests passing (100% pass rate)
 
 🚧 **In Progress:**
-- HTTP client integration for OpenAI
-- Anthropic and Gemini providers
-- ChainOfThought and ReAct modules
+- Advanced agent frameworks
+- Optimizers (MIPRO, BootstrapFewShot, etc.)
 
 ## Quick Start
 
@@ -37,29 +45,25 @@ luajit --version  # Ensure LuaJIT 2.1+
 ```lua
 local dslua = require("dslua")
 
+-- Create LLM provider (OpenAI, Anthropic, Gemini, Ollama)
+local llm = dslua.llms.OpenAI("your-api-key", "gpt-3.5-turbo")
+
 -- Create signature (input/output contract)
 local signature = dslua.Signature.new(
     {dslua.Field.new("question")},
     {dslua.Field.new("answer")}
 )
 
--- Create predict module
-local predict = dslua.Predict.new(signature)
+-- Create ChainOfThought module for reasoning
+local cot = dslua.ChainOfThought.new(signature)
 
--- Create mock LLM (replace with real OpenAI when HTTP is integrated)
-local mock_llm = {
-    Complete = function(self, ctx, prompt, opts)
-        -- This would call OpenAI API
-        return {answer = "42"}
-    end
-}
+-- Create context with LLM
+local ctx = dslua.Context.new({llm = llm})
 
--- Create context
-local ctx = dslua.Context.new({llm = mock_llm})
-
--- Execute
-local result = predict:Process(ctx, {question = "What is 6*7?"})
-print(result.answer)  -- 42
+-- Execute with reasoning
+local result = cot:Process(ctx, {question = "What is 6*7?"})
+print(result.answer)     -- "42"
+print(result.reasoning)  -- Step-by-step reasoning
 ```
 
 ### CLI
@@ -81,8 +85,7 @@ print(result.answer)  -- 42
 ## Progress
 
 - [x] Phase 1: Core abstractions (Field, Signature, Context, Module, Predict)
-- [ ] Phase 1: HTTP client integration
-- [ ] Phase 2: ChainOfThought, ReAct, Refine modules
+- [x] Phase 2: HTTP Integration and Advanced Modules
 - [ ] Phase 3: Agents and Advanced Features
 - [ ] Phase 4: Optimizers
 
