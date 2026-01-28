@@ -2,7 +2,7 @@
 
 DSPy for Lua - LLM orchestration framework with composable modules, agents, and optimizers.
 
-**Status:** 🚧 Under Active Development
+**Status:** 🚧 Under Active Development (Phase 1)
 
 This is a Lua port of [DSPy-Go](https://github.com/postfix/dspy-go), bringing systematic prompt engineering and automated reasoning capabilities to Lua applications through LuaJIT 2.1+.
 
@@ -10,74 +10,81 @@ This is a Lua port of [DSPy-Go](https://github.com/postfix/dspy-go), bringing sy
 
 dslua is a native Lua implementation of the DSPy framework for building reliable LLM applications. Use composable modules and workflows to orchestrate LLM calls with minimal overhead.
 
-## Key Features
+## Current Status (Phase 1)
 
-| Feature | Description |
-|---------|-------------|
-| **Modular Architecture** | Compose simple, reusable components into complex applications |
-| **Multiple LLM Providers** | OpenAI, Anthropic, Google Gemini, Ollama, and more |
-| **Advanced Modules** | Predict, ChainOfThought, ReAct, RLM, Refine, Parallel |
-| **Intelligent Agents** | ReAct patterns, ACE framework for self-improving agents |
-| **Smart Tool Management** | Bayesian selection, chaining, composition |
-| **Quality Optimizers** | GEPA, MIPRO, SIMBA, BootstrapFewShot |
-| **Structured Output** | JSON structured output with schema validation |
+✅ **Implemented:**
+- Core abstractions: Field, Signature, Context, Module base
+- Predict module for direct LLM prediction
+- OpenAI provider structure (HTTP integration pending)
 
-## Installation
+🚧 **In Progress:**
+- HTTP client integration for OpenAI
+- Anthropic and Gemini providers
+- ChainOfThought and ReAct modules
+
+## Quick Start
+
+### Installation
 
 ```bash
 git clone https://github.com/postfix/dslua.git
 cd dslua
+luajit --version  # Ensure LuaJIT 2.1+
 ```
 
-## Quick Start
-
-### CLI (Zero Code)
-
-```bash
-./cli/dslua list                           # See all optimizers
-./cli/dslua try mipro --dataset gsm8k      # Test optimizer instantly
-./cli/dslua view session.jsonl --stats     # View RLM session logs
-```
-
-### Programming
+### Programming API
 
 ```lua
 local dslua = require("dslua")
 
--- Configure LLM
-local openai = dslua.llms.OpenAI("your-api-key", "gpt-4")
-
--- Create signature and module
+-- Create signature (input/output contract)
 local signature = dslua.Signature.new(
     {dslua.Field.new("question")},
     {dslua.Field.new("answer")}
 )
-local cot = dslua.ChainOfThought.new(signature)
+
+-- Create predict module
+local predict = dslua.Predict.new(signature)
+
+-- Create mock LLM (replace with real OpenAI when HTTP is integrated)
+local mock_llm = {
+    Complete = function(self, ctx, prompt, opts)
+        -- This would call OpenAI API
+        return {answer = "42"}
+    end
+}
+
+-- Create context
+local ctx = dslua.Context.new({llm = mock_llm})
 
 -- Execute
-local ctx = dslua.Context.new({llm = openai})
-local result = cot:Process(ctx, {question = "What is the capital of France?"})
-print(result.answer)  -- Paris
+local result = predict:Process(ctx, {question = "What is 6*7?"})
+print(result.answer)  -- 42
+```
+
+### CLI
+
+```bash
+./cli/dslua list    # List available optimizers
+./cli/dslua help    # Show help
 ```
 
 ## Requirements
 
 - **LuaJIT 2.1+** - Required for performance and FFI support
-- No external package manager needed (dependencies are vendored)
 
 ## Documentation
 
-See [DESIGN.md](DESIGN.md) for the complete architecture and implementation roadmap.
+- [DESIGN.md](DESIGN.md) - Complete architecture and implementation roadmap
+- [Phase 1 Plan](docs/plans/2026-01-28-phase1-core-abstractions.md) - Detailed implementation steps
 
 ## Progress
 
-This project is under active development. The core architecture is designed, with implementation planned in phases:
-
-- [x] Complete design document
-- [ ] Phase 1: Foundation (Core abstractions, OpenAI provider, Predict module)
-- [ ] Phase 2: Core Modules (ChainOfThought, ReAct, Refine, other providers)
-- [ ] Phase 3: Agents and Advanced Features (ReAct agent, ACE, tools, CLI)
-- [ ] Phase 4: Optimizers and Polish (MIPRO, GEPA, SIMBA, documentation)
+- [x] Phase 1: Core abstractions (Field, Signature, Context, Module, Predict)
+- [ ] Phase 1: HTTP client integration
+- [ ] Phase 2: ChainOfThought, ReAct, Refine modules
+- [ ] Phase 3: Agents and Advanced Features
+- [ ] Phase 4: Optimizers
 
 See [DESIGN.md](DESIGN.md) for detailed implementation phases.
 
