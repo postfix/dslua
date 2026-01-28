@@ -1,0 +1,41 @@
+# Lua
+*.luac
+!.luacheckrc
+
+# LuaJIT
+*.lj
+jit/*
+
+# Dependencies
+deps/*/build/
+deps/*/src/*.o
+deps/*/src/*.so
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+*.log
+.busted
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# Documentation build
+docs/public/
+docs/resources/
+
+# Coverage
+*.luacov
+luacov.stats.out
+luacov.report.out
