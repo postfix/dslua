@@ -6,6 +6,9 @@
 *.lj
 jit/*
 
+# Git worktrees
+.worktrees/
+
 # Dependencies
 deps/*/build/
 deps/*/src/*.o
