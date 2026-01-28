@@ -2,7 +2,7 @@
 
 DSPy for Lua - LLM orchestration framework with composable modules, agents, and optimizers.
 
-**Status:** ✅ Phase 3 Complete - ReAct Agent Framework
+**Status:** ✅ Phase 4 Complete - Optimizer Framework
 
 This is a Lua port of [DSPy-Go](https://github.com/postfix/dspy-go), bringing systematic prompt engineering and automated reasoning capabilities to Lua applications through LuaJIT 2.1+.
 
@@ -10,7 +10,7 @@ This is a Lua port of [DSPy-Go](https://github.com/postfix/dspy-go), bringing sy
 
 dslua is a native Lua implementation of the DSPy framework for building reliable LLM applications. Use composable modules and workflows to orchestrate LLM calls with minimal overhead.
 
-## Current Status (Phase 3 Complete)
+## Current Status (Phase 4 Complete)
 
 ✅ **Implemented:**
 - Core abstractions: Field, Signature, Context, Module base
@@ -21,15 +21,18 @@ dslua is a native Lua implementation of the DSPy framework for building reliable
 - **ReActAgent Framework** with enhanced context and retry logic
 - **Tool Registry** for centralized tool management
 - **Built-in tools** (Calculator, StringHelper, SearchTool)
+- **Optimizer framework** with Compile/Evaluate interface
+- **FewShot module** for demonstration prompts
+- **BootstrapFewShot** for automated prompt tuning
 - HTTP client integration (lua-http + dkjson)
 - OpenAI provider with real API calls
 - Anthropic provider (Claude API)
 - Gemini provider (Google API)
 - Ollama provider for local testing
-- **125 tests passing** (100% pass rate)
+- **147 tests passing** (100% pass rate)
 
 🚧 **In Progress:**
-- Advanced optimizers (MIPRO, BootstrapFewShot, etc.)
+- Advanced optimizers (MIPRO, etc.)
 - ACE framework with learning
 
 ## Quick Start
@@ -121,6 +124,37 @@ registry:Register("weather", weather_tool, {
 })
 ```
 
+### Using Optimizers
+
+```lua
+local dslua = require("dslua")
+
+-- Prepare training data
+local trainset = {
+    {input = {question = "2+2"}, output = {answer = "4"}},
+    {input = {question = "3+3"}, output = {answer = "6"}},
+    {input = {question = "4+4"}, output = {answer = "8"}}
+}
+
+-- Create base module
+local module = dslua.Predict.new(signature)
+
+-- Create optimizer
+local optimizer = dslua.BootstrapFewShot.new(module, {
+    trainset = trainset,
+    valset = trainset,
+    max_bootstraps = 10,
+    max_labeled_demos = 3
+})
+
+-- Compile optimized program
+local optimized = optimizer:Compile(ctx, 10)
+
+-- Use optimized program
+local result = optimized:Process(ctx, {question = "5+5"})
+print(result.answer)  -- "10" (learned from demonstrations)
+```
+
 ### CLI
 
 ```bash
@@ -142,7 +176,7 @@ registry:Register("weather", weather_tool, {
 - [x] Phase 1: Core abstractions (Field, Signature, Context, Module, Predict)
 - [x] Phase 2: HTTP Integration and Advanced Modules
 - [x] Phase 3: ReAct Agent Framework with Tool Registry
-- [ ] Phase 4: Optimizers
+- [x] Phase 4: Optimizers with BootstrapFewShot
 
 See [DESIGN.md](DESIGN.md) for detailed implementation phases.
 
