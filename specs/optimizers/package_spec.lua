@@ -1,0 +1,17 @@
+describe("Optimizers Package", function()
+    it("should export BaseOptimizer", function()
+        local optimizers = require("dslua.optimizers")
+        assert.is_not_nil(optimizers.Base)
+    end)
+
+    it("should export BootstrapFewShot", function()
+        local optimizers = require("dslua.optimizers")
+        assert.is_not_nil(optimizers.BootstrapFewShot)
+    end)
+
+    it("should be accessible from main dslua package", function()
+        local dslua = require("dslua")
+        assert.is_not_nil(dslua.BaseOptimizer)
+        assert.is_not_nil(dslua.BootstrapFewShot)
+    end)
+end)

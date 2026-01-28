@@ -5,5 +5,6 @@ M.Predict = require("dslua.modules.predict")
 M.ChainOfThought = require("dslua.modules.chain_of_thought")
 M.ReAct = require("dslua.modules.react")
 M.Refine = require("dslua.modules.refine")
+M.FewShot = require("dslua.modules.fewshot")
 
 return M
