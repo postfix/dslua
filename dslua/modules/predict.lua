@@ -34,4 +34,17 @@ function Predict:_buildPrompt(input)
     return table.concat(parts, "\n")
 end
 
+function Predict:_formatInputs(input)
+    local parts = {}
+
+    for _, field in ipairs(self._signature:InputFields()) do
+        local value = input[field:Name()]
+        if value then
+            table.insert(parts, string.format("%s: %s", field:Name(), tostring(value)))
+        end
+    end
+
+    return table.concat(parts, "\n")
+end
+
 return Predict
