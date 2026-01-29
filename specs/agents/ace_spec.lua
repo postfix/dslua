@@ -216,3 +216,63 @@ describe("ACE Rule Matching", function()
         assert.is_true(score_for_rule <= 0.9)
     end)
 end)
+
+describe("ACE Action Selection", function()
+    local ACE = require("dslua.agents.ace")
+
+    setup(function()
+        local signature = require("dslua.core.signature").new(
+            {require("dslua.core.field").new("question")},
+            {require("dslua.core.field").new("answer")}
+        )
+        local module = require("dslua.modules.predict").new(signature)
+        _ace = ACE.new(module, {rules = {}})
+    end)
+
+    it("should select highest-scoring action", function()
+        local rules = {
+            {action = "DECOMPOSE", weight = 0.9, id = 1, conditions = {}},
+            {action = "ANSWER", weight = 0.6, id = 2, conditions = {}}
+        }
+
+        local state = {task = {}, self = {}, history = {}}
+        local action = _ace:_SelectAction(state, rules)
+
+        assert.is.equal("DECOMPOSE", action)
+    end)
+
+    it("should use fallback when no rules match", function()
+        local rules = {}  -- No rules
+
+        local state = {task = {}, self = {}, history = {}}
+        local action = _ace:_SelectAction(state, rules)
+
+        assert.is.equal("REASON", action)  -- Default fallback
+    end)
+
+    it("should break ties by recency (higher ID)", function()
+        local rules = {
+            {action = "OLD", weight = 0.8, id = 1, conditions = {}},
+            {action = "NEW", weight = 0.8, id = 10, conditions = {}}
+        }
+
+        local state = {task = {}, self = {}, history = {}}
+        local action = _ace:_SelectAction(state, rules)
+
+        assert.is.equal("NEW", action)  -- Higher ID wins
+    end)
+
+    it("should record decision with competing alternatives", function()
+        local rules = {
+            {action = "WIN", weight = 0.9, id = 1, conditions = {}},
+            {action = "LOSE", weight = 0.7, id = 2, conditions = {}}
+        }
+
+        local state = {task = {}, self = {}, history = {}}
+        local decision = _ace:_DecideWithLogging(state, rules)
+
+        assert.is.equal("WIN", decision.action)
+        assert.is_not_nil(decision.competing_actions)
+        assert.is_true(#decision.competing_actions >= 1)
+    end)
+end)

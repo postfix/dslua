@@ -185,4 +185,64 @@ function ACE:_ComputeSalience(rule, state)
     return 1.0
 end
 
+function ACE:_SelectAction(state, rules)
+    if #rules == 0 then
+        return "REASON"  -- Fallback action
+    end
+
+    local scores = self:_ScoreRules(rules, state)
+
+    -- Find highest score
+    local best_rule = nil
+    local best_score = -1
+
+    for _, rule in ipairs(rules) do
+        if scores[rule] and scores[rule] > best_score then
+            best_score = scores[rule]
+            best_rule = rule
+        elseif scores[rule] and scores[rule] == best_score then
+            -- Tie-break by higher ID (more recent)
+            if rule.id > best_rule.id then
+                best_rule = rule
+            end
+        end
+    end
+
+    return best_rule.action
+end
+
+function ACE:_DecideWithLogging(state, rules)
+    local matches = self:_FindMatchingRules(state, rules)
+    local action = self:_SelectAction(state, matches)
+
+    -- Collect competing actions for logging
+    local competing = {}
+    for _, rule in ipairs(matches) do
+        if rule.action ~= action then
+            table.insert(competing, {
+                action = rule.action,
+                score = self:_ScoreRules({rule}, state)[rule]
+            })
+        end
+    end
+
+    return {
+        action = action,
+        competing_actions = competing,
+        state_snapshot = self:_ShallowCopy(state)
+    }
+end
+
+function ACE:_ShallowCopy(obj)
+    local copy = {}
+    for k, v in pairs(obj) do
+        if type(v) == "table" then
+            copy[k] = "[TABLE]"  -- Don't deep copy for logging
+        else
+            copy[k] = v
+        end
+    end
+    return copy
+end
+
 return ACE
