@@ -102,4 +102,87 @@ function ACE:_ExtractTaskFeatures(input)
     }
 end
 
+function ACE:_FindMatchingRules(state, rules)
+    local matches = {}
+
+    for _, rule in ipairs(rules) do
+        if self:_RuleMatches(rule, state) then
+            table.insert(matches, rule)
+        end
+    end
+
+    return matches
+end
+
+function ACE:_RuleMatches(rule, state)
+    for feature_name, condition in pairs(rule.conditions) do
+        if not self:_ConditionMatches(condition, state, feature_name) then
+            return false
+        end
+    end
+    return true
+end
+
+function ACE:_ConditionMatches(condition, state, feature_name)
+    -- Find feature value in state (search across task, self, history)
+    local feature_value = self:_GetFeatureValue(state, feature_name)
+    if feature_value == nil then
+        return false
+    end
+
+    local op = condition.op
+    local threshold = condition.threshold
+    local value = condition.value
+
+    if op == "==" then
+        return feature_value == value
+    elseif op == ">" then
+        return feature_value > threshold
+    elseif op == "<" then
+        return feature_value < threshold
+    elseif op == ">=" then
+        return feature_value >= threshold
+    elseif op == "<=" then
+        return feature_value <= threshold
+    else
+        return false
+    end
+end
+
+function ACE:_GetFeatureValue(state, feature_name)
+    -- Search in task layer
+    if state.task[feature_name] ~= nil then
+        return state.task[feature_name]
+    end
+
+    -- Search in self layer
+    if state.self[feature_name] ~= nil then
+        return state.self[feature_name]
+    end
+
+    -- Search in history layer (for historical success rates)
+    if state.history[feature_name] ~= nil then
+        return state.history[feature_name]
+    end
+
+    return nil
+end
+
+function ACE:_ScoreRules(rules, state)
+    local scores = {}
+
+    for _, rule in ipairs(rules) do
+        local salience = self:_ComputeSalience(rule, state)
+        scores[rule] = rule.weight * salience
+    end
+
+    return scores
+end
+
+function ACE:_ComputeSalience(rule, state)
+    -- Simple salience: how strongly conditions are satisfied
+    -- For now, use a constant; can be enhanced later
+    return 1.0
+end
+
 return ACE

@@ -81,3 +81,138 @@ describe("ACE Base Class", function()
         assert.is.equal(0, state.history.total_executions)
     end)
 end)
+
+describe("ACE Rule Matching", function()
+    local ACE = require("dslua.agents.ace")
+
+    setup(function()
+        local signature = require("dslua.core.signature").new(
+            {require("dslua.core.field").new("question")},
+            {require("dslua.core.field").new("answer")}
+        )
+        local module = require("dslua.modules.predict").new(signature)
+        _ace = ACE.new(module, {rules = {}})
+    end)
+
+    it("should match rules with simple equality conditions", function()
+        local rules = {
+            {
+                name = "test_rule",
+                conditions = {
+                    task_type = {op = "==", value = "math"}
+                },
+                action = "USE_CALCULATOR",
+                weight = 0.9,
+                id = 1
+            }
+        }
+
+        local state = {
+            task = {task_type = "math"},
+            self = {confidence = 0.5},
+            history = {}
+        }
+
+        local matches = _ace:_FindMatchingRules(state, rules)
+        assert.is.equal(1, #matches)
+        assert.is.equal("test_rule", matches[1].name)
+    end)
+
+    it("should match rules with greater-than conditions", function()
+        local rules = {
+            {
+                name = "complexity_rule",
+                conditions = {
+                    complexity_estimate = {op = ">", threshold = 0.7}
+                },
+                action = "DECOMPOSE",
+                weight = 0.8,
+                id = 2
+            }
+        }
+
+        local state = {
+            task = {complexity_estimate = 0.85},
+            self = {confidence = 0.5},
+            history = {}
+        }
+
+        local matches = _ace:_FindMatchingRules(state, rules)
+        assert.is.equal(1, #matches)
+    end)
+
+    it("should match rules with less-than conditions", function()
+        local rules = {
+            {
+                name = "confidence_rule",
+                conditions = {
+                    confidence = {op = "<", threshold = 0.6}
+                },
+                action = "VERIFY",
+                weight = 0.7,
+                id = 3
+            }
+        }
+
+        local state = {
+            task = {},
+            self = {confidence = 0.4},
+            history = {}
+        }
+
+        local matches = _ace:_FindMatchingRules(state, rules)
+        assert.is.equal(1, #matches)
+    end)
+
+    it("should not match rules that fail conditions", function()
+        local rules = {
+            {
+                name = "high_complexity",
+                conditions = {
+                    complexity_estimate = {op = ">", threshold = 0.7}
+                },
+                action = "DECOMPOSE",
+                weight = 0.8,
+                id = 4
+            }
+        }
+
+        local state = {
+            task = {complexity_estimate = 0.5},
+            self = {confidence = 0.5},
+            history = {}
+        }
+
+        local matches = _ace:_FindMatchingRules(state, rules)
+        assert.is.equal(0, #matches)
+    end)
+
+    it("should score rules by weight × salience", function()
+        local rules = {
+            {
+                name = "strong_match",
+                conditions = {confidence = {op = "<", threshold = 0.6}},
+                action = "VERIFY",
+                weight = 0.9,
+                id = 5
+            }
+        }
+
+        local state = {
+            task = {},
+            self = {confidence = 0.3},  -- well below threshold
+            history = {}
+        }
+
+        local matches = _ace:_FindMatchingRules(state, rules)
+        local scores = _ace:_ScoreRules(matches, state)
+
+        -- Salience based on how far past threshold (0.6 - 0.3 = 0.3)
+        -- Score = 0.9 × salience (currently 1.0)
+        -- scores is a table with rules as keys
+        local score_for_rule = scores[matches[1]]
+        assert.is_not_nil(score_for_rule)
+        assert.is_true(score_for_rule > 0)
+        assert.is_true(score_for_rule <= 0.9)
+    end)
+end)
