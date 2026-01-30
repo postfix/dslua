@@ -276,3 +276,120 @@ describe("ACE Action Selection", function()
         assert.is_true(#decision.competing_actions >= 1)
     end)
 end)
+
+describe("ACE Execution Loop", function()
+    local Field = require("dslua.core.field")
+    local Signature = require("dslua.core.signature")
+    local Context = require("dslua.core.context")
+    local ACE = require("dslua.agents.ace")
+
+    it("should execute REASON action by delegating to module", function()
+        local signature = Signature.new(
+            {Field.new("question")},
+            {Field.new("answer")}
+        )
+
+        local mock_llm = {
+            Complete = function(self, ctx, prompt)
+                return {content = "Answer: 42"}
+            end
+        }
+
+        local module = require("dslua.modules.predict").new(signature)
+        module:WithLLM(mock_llm)
+
+        local rules = {
+            {action = "REASON", weight = 0.9, id = 1, conditions = {}}
+        }
+
+        local ace = ACE.new(module, {rules = rules})
+        local ctx = Context.new({})
+
+        local result = ace:Execute(ctx, {question = "What is 6*7?"})
+
+        assert.is.equal("42", result.answer)
+        assert.is.equal(1, result.stats.steps_taken)
+    end)
+
+    it("should track action history during execution", function()
+        local signature = Signature.new(
+            {Field.new("question")},
+            {Field.new("answer")}
+        )
+
+        local mock_llm = {
+            Complete = function(self, ctx, prompt)
+                return {content = "Answer: test"}
+            end
+        }
+
+        local module = require("dslua.modules.predict").new(signature)
+        module:WithLLM(mock_llm)
+
+        local rules = {
+            {action = "REASON", weight = 0.9, id = 1, conditions = {}}
+        }
+
+        local ace = ACE.new(module, {rules = rules, max_steps = 5})
+        local ctx = Context.new({})
+
+        local result = ace:Execute(ctx, {question = "test"})
+
+        assert.is_not_nil(result.stats.action_history)
+        assert.is_true(#result.stats.action_history >= 1)
+    end)
+
+    it("should timeout when max_steps exceeded", function()
+        local signature = Signature.new(
+            {Field.new("question")},
+            {Field.new("answer")}
+        )
+
+        local module = {
+            Process = function(self, ctx, input)
+                -- Always return DECOMPOSE (never terminates)
+                return {answer = nil, action = "DECOMPOSE"}
+            end,
+            Signature = function() return signature end
+        }
+
+        local rules = {
+            {action = "DECOMPOSE", weight = 0.9, id = 1, conditions = {}}
+        }
+
+        local ace = ACE.new(module, {rules = rules, max_steps = 3})
+        local ctx = Context.new({})
+
+        local result = ace:Execute(ctx, {question = "test"})
+
+        assert.is.equal("TIMEOUT", result.termination_reason)
+    end)
+
+    it("should return result on TERMINATE action", function()
+        local signature = Signature.new(
+            {Field.new("question")},
+            {Field.new("answer")}
+        )
+
+        local mock_llm = {
+            Complete = function(self, ctx, prompt)
+                return {content = "Answer: Paris"}
+            end
+        }
+
+        local module = require("dslua.modules.predict").new(signature)
+        module:WithLLM(mock_llm)
+
+        local rules = {
+            {action = "TERMINATE", weight = 0.9, id = 1, conditions = {}}
+        }
+
+        local ace = ACE.new(module, {rules = rules})
+        local ctx = Context.new({})
+
+        local result = ace:Execute(ctx, {question = "Capital of France?"})
+
+        assert.is.equal("Paris", result.answer)
+        assert.is.equal("SUCCESS", result.termination_reason)
+    end)
+end)

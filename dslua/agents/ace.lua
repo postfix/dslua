@@ -34,8 +34,8 @@ function ACE:_Module()
 end
 
 function ACE:_InitializeState(input)
-    return {
-        -- Layer 1: Task Features (Objective, Static)
+    local state = {
+        original_input = input.question or input,  -- Store for REASON action
         task = self:_ExtractTaskFeatures(input),
 
         -- Layer 2: Self-Monitoring (Dynamic, Per-Step)
@@ -54,6 +54,8 @@ function ACE:_InitializeState(input)
         -- Layer 3: Performance History (Learned, Slow-Moving)
         history = self._history
     }
+
+    return state
 end
 
 function ACE:_ExtractTaskFeatures(input)
@@ -243,6 +245,131 @@ function ACE:_ShallowCopy(obj)
         end
     end
     return copy
+end
+
+function ACE:Execute(ctx, input, opts)
+    opts = opts or {}
+    local state = self:_InitializeState(input)
+
+    while state.self.steps_taken < state.self.max_steps_limit do
+        -- Decide next action
+        local decision = self:_DecideWithLogging(state, self._rules)
+        local action = decision.action
+
+        -- Log decision if enabled
+        if self._config.log_decisions then
+            self:_LogDecision(state, decision)
+        end
+
+        -- Execute action
+        local action_result = self:_ExecuteAction(ctx, state, action)
+
+        -- Update state
+        state.self.current_action = action
+        table.insert(state.self.action_history, action)
+        state.self.steps_taken = state.self.steps_taken + 1
+
+        -- Update confidence if action returned it
+        if action_result.confidence then
+            state.self.confidence = action_result.confidence
+            table.insert(state.self.confidence_trajectory, action_result.confidence)
+        end
+
+        -- Check if we have a final answer
+        if action_result.answer then
+            state.answer = action_result.answer
+        end
+
+        -- Check for termination (after execution)
+        if action == "TERMINATE" then
+            return self:_FormatResult(state, "SUCCESS")
+        end
+
+        -- If REASON action produced an answer, we're done
+        if action == "REASON" and action_result.answer then
+            return self:_FormatResult(state, "SUCCESS")
+        end
+    end
+
+    -- Timeout
+    return self:_FormatResult(state, "TIMEOUT")
+end
+
+function ACE:_ExecuteAction(ctx, state, action)
+    local result = nil
+
+    if action == "REASON" then
+        -- Delegate to wrapped module
+        local input = {question = state.original_input or state.task.input}
+        local response = self._module:Process(ctx, input)
+
+        -- Parse response to extract answer
+        -- If response is a table with content, parse it
+        if type(response) == "table" and response.content then
+            result = self:_ParseLLMResponse(response.content)
+        else
+            result = response
+        end
+    elseif action == "DECOMPOSE" then
+        -- For now, just delegate to REASON
+        -- TODO: Implement actual decomposition
+        return self:_ExecuteAction(ctx, state, "REASON")
+    elseif action == "RETRIEVE" then
+        -- For now, just delegate to REASON
+        -- TODO: Implement tool delegation
+        return self:_ExecuteAction(ctx, state, "REASON")
+    elseif action == "SYNTHESIZE" then
+        -- For now, just delegate to REASON
+        return self:_ExecuteAction(ctx, state, "REASON")
+    elseif action == "VERIFY" then
+        -- For now, just delegate to REASON
+        return self:_ExecuteAction(ctx, state, "REASON")
+    else
+        -- Unknown action, fallback to REASON
+        return self:_ExecuteAction(ctx, state, "REASON")
+    end
+
+    return result or {}
+end
+
+function ACE:_ParseLLMResponse(content)
+    -- Try to extract answer from content
+    -- Look for patterns like "Answer: <value>" or just return the content
+    local answer = content:match("Answer:%s*(.+)")
+
+    if answer then
+        return {answer = answer, content = content}
+    else
+        -- No pattern found, return content as answer
+        return {answer = content, content = content}
+    end
+end
+
+function ACE:_LogDecision(state, decision)
+    -- TODO: Implement decision logging
+    -- For now, just store in memory
+    if not self._decision_log then
+        self._decision_log = {}
+    end
+    table.insert(self._decision_log, {
+        step = state.self.steps_taken,
+        action = decision.action,
+        competing = decision.competing_actions
+    })
+end
+
+function ACE:_FormatResult(state, termination_reason)
+    local result = {
+        answer = state.answer,
+        stats = {
+            steps_taken = state.self.steps_taken,
+            action_history = state.self.action_history,
+            confidence = state.self.confidence
+        },
+        termination_reason = termination_reason
+    }
+
+    return result
 end
 
 return ACE
