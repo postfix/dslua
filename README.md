@@ -10,7 +10,7 @@ This is a Lua port of [DSPy-Go](https://github.com/postfix/dspy-go), bringing sy
 
 dslua is a native Lua implementation of the DSPy framework for building reliable LLM applications. Use composable modules and workflows to orchestrate LLM calls with minimal overhead.
 
-## Current Status (Phase 4 Complete)
+## Current Status (Phase 3 - In Progress)
 
 ✅ **Implemented:**
 - Core abstractions: Field, Signature, Context, Module base
@@ -29,11 +29,21 @@ dslua is a native Lua implementation of the DSPy framework for building reliable
 - Anthropic provider (Claude API)
 - Gemini provider (Google API)
 - Ollama provider for local testing
-- **147 tests passing** (100% pass rate)
+- **172 tests passing** (100% pass rate for ACE)
 
 🚧 **In Progress:**
+- **ACE (Autonomous Cognitive Entity)** - Phase 1 MVP complete
+  - ✅ Core decision engine with rule matching
+  - ✅ Three-layer state representation
+  - ✅ Hand-coded rule set
+  - ⏳ Learning from demonstrations (Phase 2)
+  - ⏳ Pattern mining + outcome feedback (Phase 3)
+
+📋 **Planned:**
 - Advanced optimizers (MIPRO, etc.)
-- ACE framework with learning
+- Tool chaining and composition
+- Structured output (JSON adapter)
+- CLI interface
 
 ## Quick Start
 
@@ -154,6 +164,43 @@ local optimized = optimizer:Compile(ctx, 10)
 local result = optimized:Process(ctx, {question = "5+5"})
 print(result.answer)  -- "10" (learned from demonstrations)
 ```
+
+### Using ACE (Autonomous Cognitive Entity)
+
+ACE learns optimal execution paths through experience, coordinating existing modules and tools:
+
+```lua
+local dslua = require("dslua")
+
+-- Create base module
+local signature = dslua.Signature.new(
+    {dslua.Field.new("question")},
+    {dslua.Field.new("answer")}
+)
+local module = dslua.Predict.new(signature)
+
+-- Create ACE with default rules
+local ace = dslua.ACE.new(module, {
+    rules = dslua.ACERules,  -- Hand-coded rules
+    learning_mode = "passive",  -- "active" enables learning
+    max_steps = 10
+})
+
+-- Execute with automatic execution path selection
+local ctx = dslua.Context.new({llm = llm})
+local result = ace:Execute(ctx, {question = "What is the capital of France?"})
+
+print(result.answer)  -- "Paris"
+print(result.stats.steps_taken)  -- 1-3 depending on task complexity
+print(result.stats.action_history)  -- ["REASON"] or ["DECOMPOSE", "RETRIEVE", "SYNTHESIZE"]
+```
+
+ACE automatically:
+- Decomposes complex tasks
+- Retrieves information for factual questions
+- Uses calculator for math problems
+- Verifies results when confidence is low
+- Adapts execution strategy based on task features
 
 ### CLI
 
