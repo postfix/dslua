@@ -329,7 +329,7 @@ function ACE:LoadDemonstrations(dirpath, opts)
 **Default Options:**
 - `recursive = false` (scan top-level only)
 - `pattern = "%.json$"` (Lua pattern for .json files)
-- `max_file_size = 1_000_000` (1MB max per demo file, prevents JSON bombs)
+- `max_file_size = 1000000` (1MB max per demo file, prevents JSON bombs)
 - `max_decisions = 100` (max decisions per demo, prevents abuse)
 - Files sorted alphabetically for **deterministic loading order**
 
@@ -568,6 +568,12 @@ if #R_star == 0 then
 end
 ```
 
+**Coverage Failure Handling:**
+- Phase 2 **cannot invent new rules** - it only adjusts weights of existing rules
+- `uncovered_actions` metric identifies which actions need new rules
+- Rule authoring is a **manual TODO** for when uncovered actions are frequent
+- This is intentional: Phase 2 is weight-only learning, not rule synthesis
+
 #### Step 4: Compute Margin and Update Budget
 
 ```lua
@@ -583,7 +589,13 @@ end
 
 **Constants:**
 - `eps = 1e-9` (prevents division by zero)
-- `min_margin = 0.05` (default)
+- `min_margin = 0.05` (default, in "score units")
+
+**Margin Units:**
+- Since `salience ∈ [0,1]` and `weights ∈ [0.1, 1.0]`, scores are in the range `[0, num_rules]`
+- With 6 rules, max score ≈ 6.0 (all rules with weight=1.0, salience=1.0)
+- `min_margin = 0.05` represents ~0.8% of max score (small but meaningful)
+- `min_margin` is invariant to normalization modes (applied before any normalization)
 
 #### Step 5: Distribute Updates by Contribution (Corrected)
 
@@ -627,8 +639,17 @@ If delta_total = 0.02:
   Rule B gets 0.02 * (0.1 / 1.0) = 0.002 (10% of update)
 ```
 
-**Tie-Breaking:**
-- When all scores equal (including zero), ACE predicts fallback action `REASON`
+**Tie-Breaking (Deterministic):**
+
+Two cases handled separately:
+
+1. **All scores equal to 0:** No rules match any action → fallback to `REASON`
+2. **Tie on non-zero max scores:** Apply deterministic priority order:
+   - `REASON` > `RETRIEVE` > `DECOMPOSE` > `SYNTHESIZE` > `VERIFY` > `TERMINATE`
+
+This ensures deterministic behavior and prevents random policy shifts when scores tie.
+
+**Special Case:**
 - If `score_star == score_comp` and `#R_comp == 0`, only increase `R_star` weights (no decrease)
 
 **Clamping Behavior:**
@@ -732,7 +753,7 @@ dataset = {
     min_margin = 0.05,
     epsilon = 0.01,
     normalization = "none",
-    weight_bounds = [0.1, 1.0]
+    weight_bounds = {0.1, 1.0}
   },
   system_info = {
     dslua_version = "0.4.0",  -- or commit hash
@@ -945,15 +966,15 @@ dataset = {
 
 ```lua
 {
-  ["RETRIEVE->REASON"] = 4,     -- demo: RETRIEVE, predicted: REASON
-  ["DECOMPOSE->REASON"] = 2,
-  ["VERIFY->SYNTHESIZE"] = 1
+  confusions = {
+    ["RETRIEVE->REASON"] = 4,     -- demo: RETRIEVE, predicted: REASON
+    ["DECOMPOSE->REASON"] = 2,
+    ["VERIFY->SYNTHESIZE"] = 1
+  },
+  total_confusions = 7,
+  most_common_confusion = "RETRIEVE->REASON",
+  confusion_rate = 0.15  -- 7/47 decisions
 }
-
--- Summary statistics
-total_confusions = 7,
-most_common_confusion = "RETRIEVE->REASON",
-confusion_rate = 0.15  -- 7/47 decisions
 ```
 
 #### Clamp Events
@@ -973,7 +994,7 @@ clamp_events = {
 
 ```lua
 {
-  threshold_candidates = [
+  threshold_candidates = {
     {
       rule = "factual_retrieval",
       field = "confidence",
@@ -992,7 +1013,7 @@ clamp_events = {
       confidence = "low",  -- based on 5 decisions
       evidence_count = 5
     }
-  ]
+  }
 }
 ```
 
