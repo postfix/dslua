@@ -1,10 +1,10 @@
 # ACE Phase 2: Learning from Demonstrations - Design Document
 
-**Status:** Design v1.3 (Final) | Implementation Ready
+**Status:** Design v1.4 (Final) | Implementation Ready
 
 **Created:** 2026-01-30
 
-**Last Updated:** 2026-01-30 (Pseudocode corrections, syntax fixes, algorithm consistency)
+**Last Updated:** 2026-01-30 (Final implementation fixes: salience clarity, determinism, offline training operational)
 
 **Goal:** Enable ACE to learn from demonstration traces by updating rule weights to match expert behavior, while keeping thresholds fixed for stability.
 
@@ -409,8 +409,11 @@ function ACE:_PassesQualityFilter(demo)
 - Prevents learning from oscillation/redo patterns
 
 **Tool Failure Inference (Self-Traces Only):**
-- Reject if multiple consecutive actions show same action with low confidence
-- Reject if `outcome.termination_reason == "ERROR"` or tool error indicators present
+- **If `self.self_extra.tool_failures` present:** Reject if `tool_failures > 0` (explicit tool failure count)
+- **Otherwise (Phase 2 minimal self-state):** Use outcome-based filtering only:
+  - Reject if `outcome.termination_reason == "ERROR"`
+  - Reject if multiple consecutive actions show same action with low confidence (< 0.3)
+- This keeps Phase 2 "minimal self-state" consistent while enabling stronger filtering when optional fields are added later
 
 **Teacher traces** (`source == "teacher"`) bypass all quality filters (assumed curated).
 
@@ -481,10 +484,18 @@ end
 **Definition:** Salience quantifies how strongly a rule's conditions match the current state.
 
 **Range and Semantics:**
-- `salience ∈ [0, 1]` (normalized to unit interval)
-- `salience = 1.0`: Rule fully matches (all conditions comfortably satisfied)
+
+**Phase 2 (Binary Salience):**
+- `salience ∈ {0, 1}` (binary: rule either matches or doesn't)
+- `salience = 1.0`: Rule conditions match ( `_RuleMatches` returns true)
+- `salience = 0.0`: Rule conditions don't match
+
+**Phase 3+ (Continuous Salience - Future Enhancement):**
+- `salience ∈ [0, 1]` (continuous: smooth spectrum)
 - `salience ≈ 0.5`: Rule partially matches (near threshold boundaries)
 - `salience ≈ 0.0`: Rule barely matches (conditions at threshold edge)
+- Distance-to-threshold salience: `1.0 - (distance / threshold_range)`
+- Partial condition matching: `matched_conditions / total_conditions`
 - Monotonic with match quality: better match → higher salience
 
 **Computation (Phase 2 Simplified):**
@@ -526,6 +537,9 @@ for action, score in pairs(scores) do
     best = score
   end
 end
+
+-- Bind best to score_comp for margin computation
+score_comp = best
 
 -- Pass 2: collect epsilon-band competitor actions
 local epsilon = 0.01  -- Score units for "near tie" threshold
@@ -711,6 +725,7 @@ function ACE:_NormalizeWeights(normalization)
 - **Bounded:** No weight change exceeds `max_weight_delta` per decision, and weights clamped to `[0.1, 1.0]`
 - **Coverage-aware:** Tracks uncovered decisions where no rule supports demonstrated action
 - **Deterministic tie-breaking:** Priority order prevents random shifts
+- **Deterministic action iteration:** All action loops iterate fixed `ACTIONS_ORDER` list (REASON > RETRIEVE > DECOMPOSE > SYNTHESIZE > VERIFY > TERMINATE). Never iterate via `pairs()` for learning-critical decisions to ensure reproducibility
 - **Optional normalization:** Prevents drift accumulation across many demos
 - **Update Semantics:** Even when ACE predicts the demonstrated action, updates occur if `margin < min_margin` to strengthen robustness
 
@@ -1166,6 +1181,121 @@ demos/
    - Verify coverage diagnostics
    - Test with real demonstration files
 
+### 6.4 Learning Output Artifacts
+
+**Contract:** Define how learned weights are persisted and loaded, making offline training operational.
+
+```lua
+--- Export learned weights to JSON file
+-- @param filepath string Output file path
+-- @return boolean success True if write succeeded
+function ACE:ExportLearnedWeights(filepath)
+```
+
+**Output Format (Option A - Recommended): `ace_weights.json`**
+
+```json
+{
+  "version": "1.0",
+  "generated_at": "2026-01-30T10:00:00Z",
+  "ruleset_info": {
+    "source_ruleset": "ace_rules.lua v1",
+    "ruleset_hash": "sha256:...",
+    "base_weights": {...}  -- Original weights for reference
+  },
+  "learner_config": {
+    "learning_rate": 0.05,
+    "max_weight_delta": 0.02,
+    "min_margin": 0.05,
+    "epochs": 3,
+    "epsilon": 0.01,
+    "normalization": "none"
+  },
+  "dataset_info": {
+    "demo_count": 10,
+    "decision_count": 47,
+    "dataset_hash": "sha256:..."
+  },
+  "learned_weights": {
+    "complex_decomposition": 0.92,
+    "factual_retrieval": 0.77,
+    "math_calculator": 0.95,
+    "confident_direct_answer": 0.80,
+    "post_synthesis_verify": 0.75,
+    "default_reason_terminate": 0.2
+  }
+}
+```
+
+**Loading Learned Weights:**
+
+```lua
+--- Load weight overrides from JSON file
+-- @param filepath string Path to weights JSON file
+-- @return boolean success True if load succeeded
+function ACE:LoadWeightOverrides(filepath)
+```
+
+**Loading Behavior:**
+- Reads JSON file and validates `version` field
+- Loads `learned_weights` object
+- For each rule name: update `ace_rules.lua` weight with learned value
+- Validates weights are within `[0.1, 1.0]` range
+- Returns error on validation failure
+
+**Usage Pattern:**
+```lua
+local ace = dslua.ACE.new(module, {rules = dslua.ACERules})
+
+-- Load learned weights (if available)
+local ok = pcall(function()
+    return ace:LoadWeightOverrides("ace_weights.json")
+end)
+
+-- Train if no weights exist or explicit retrain requested
+if not ok or opts.retrain then
+    local demos = ace:LoadDemonstrations("demos/teacher/")
+    local metrics = ace:LearnFromDemonstrations(demos, {epochs = 3})
+    ace:ExportLearnedWeights("ace_weights.json")
+end
+```
+
+**Why Option A (ace_weights.json):**
+- Clean separation of concerns (rules vs learned weights)
+- Easy to version control (can track weight evolution)
+- Simple to diff and review changes
+- Doesn't modify source code files
+- Enables weight rollback without code changes
+
+**Alternative (Option B):** Generate `ace_rules_learned.lua` with updated weights embedded. More intrusive to version control but self-contained.
+
+### 6.5 Training Loop Enhancements
+
+**Epochs and Early Stopping:**
+
+```lua
+--- Learn from multiple demonstrations with epoch support
+-- @param demos table Array of demonstration objects
+-- @param opts table Options including: {learning_rate, max_weight_delta, min_margin, epochs, early_stop_patience}
+-- @return table metrics
+function ACE:LearnFromDemonstrations(demos, opts)
+```
+
+**Additional Options:**
+- `epochs = 3` (default) - Number of passes through demonstration dataset
+- `early_stop_patience = 2` - Stop if validation agreement doesn't improve by ≥1% for 2 consecutive epochs
+- `seed = nil` (optional) - Random seed for demo shuffling (nil = no shuffling, deterministic)
+
+**Determinism with Epochs:**
+- If `seed` is nil: process demos in file order (deterministic)
+- If `seed` is provided: shuffle demos using seed for reproducibility
+- Record `demo_shuffle_seed` in metrics dataset info
+
+**Early Stopping Logic:**
+- Track `val_agreement_after` across epochs
+- If `val_agreement_after` doesn't improve by `early_stop_threshold` (default 0.01) for `early_stop_patience` epochs: stop training
+- Prevents overfitting and unnecessary computation
+
 **Test Fixtures** (`demo_fixtures.lua`):
 - Minimal valid demo
 - Demo with all actions
@@ -1200,6 +1330,33 @@ demos/
 ---
 
 ## Appendix 0: Revision History
+
+### v1.4 (2026-01-30) - Final Implementation Fixes
+
+**Overview:** Applied final clarifications and operational details to make design fully implementable. All must-fix and strongly-recommended items from review addressed.
+
+**Must-Fix Items (3):**
+
+1. **Clarified salience contract for Phase 2** - Split salience documentation into "Phase 2 (Binary Salience): {0,1}" and "Phase 3+ (Continuous Salience): [0,1]" sections. Eliminates semantic mismatch between algorithm description (binary) and salience contract (continuous).
+
+2. **Added explicit score_comp binding** - Margin formula now explicitly binds `score_comp = best` after finding best competitor score. Eliminates undefined variable reference in pseudocode.
+
+3. **Added determinism guarantee** - Key Properties now specifies "All action loops iterate fixed ACTIONS_ORDER list... Never iterate via pairs() for learning-critical decisions." Ensures reproducible learning behavior.
+
+**Strongly-Recommended Items (3):**
+
+4. **Created learning output artifact contract** - New Section 6.4 defines `ace_weights.json` format with version metadata, ruleset info, learner config, dataset info, and learned weights. Added `ExportLearnedWeights` and `LoadWeightOverrides` API. Makes offline training operational.
+
+5. **Added training loop enhancements** - New Section 6.5 specifies multi-epoch training (default 3 epochs), early stopping logic (patience=2), and deterministic seeding (nil = file order). Prevents underfitting and overfitting.
+
+6. **Made self-trace tool failure inference implementable** - Updated Section 3.3 to explicitly state: "tool-failure filtering uses `self.self_extra.tool_failures` if present; otherwise only outcome-based filtering applies." Keeps Phase 2 minimal self-state consistent while enabling future extensions.
+
+**Validation Status:**
+- ✅ All v1.4 fixes applied
+- ✅ Design fully implementation-ready
+- ✅ Offline training operational
+- ✅ All edge cases addressed
+- ✅ Ready for implementation planning
 
 ### v1.3 (2026-01-30) - Pseudocode & Syntax Corrections
 
