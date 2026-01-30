@@ -34,8 +34,16 @@ function ACE:_Module()
 end
 
 function ACE:_InitializeState(input)
+    -- Store original input for REASON action
+    local original_question
+    if type(input) == "table" then
+        original_question = input.question
+    else
+        original_question = tostring(input)
+    end
+
     local state = {
-        original_input = input.question or input,  -- Store for REASON action
+        original_input = original_question,
         task = self:_ExtractTaskFeatures(input),
 
         -- Layer 2: Self-Monitoring (Dynamic, Per-Step)
@@ -95,6 +103,7 @@ function ACE:_ExtractTaskFeatures(input)
     end
 
     return {
+        input = input,  -- Store original input
         input_length = length,
         entity_count = entity_count,
         task_type = task_type,
@@ -285,8 +294,8 @@ function ACE:Execute(ctx, input, opts)
             return self:_FormatResult(state, "SUCCESS")
         end
 
-        -- If REASON action produced an answer, we're done
-        if action == "REASON" and action_result.answer then
+        -- If action produced an answer, we're done (REASON, RETRIEVE, DECOMPOSE, SYNTHESIZE, VERIFY all delegate to REASON)
+        if action_result.answer then
             return self:_FormatResult(state, "SUCCESS")
         end
     end
@@ -296,40 +305,39 @@ function ACE:Execute(ctx, input, opts)
 end
 
 function ACE:_ExecuteAction(ctx, state, action)
-    local result = nil
-
-    if action == "REASON" then
-        -- Delegate to wrapped module
-        local input = {question = state.original_input or state.task.input}
-        local response = self._module:Process(ctx, input)
-
-        -- Parse response to extract answer
-        -- If response is a table with content, parse it
-        if type(response) == "table" and response.content then
-            result = self:_ParseLLMResponse(response.content)
+    -- Wrap in pcall for error handling
+    local ok, result = pcall(function()
+        if action == "REASON" then
+            local input = {question = state.original_input}
+            return self._module:Process(ctx, input)
+        elseif action == "DECOMPOSE" then
+            return self:_ExecuteAction(ctx, state, "REASON")
+        elseif action == "RETRIEVE" then
+            return self:_ExecuteAction(ctx, state, "REASON")
+        elseif action == "SYNTHESIZE" then
+            return self:_ExecuteAction(ctx, state, "REASON")
+        elseif action == "VERIFY" then
+            return self:_ExecuteAction(ctx, state, "REASON")
         else
-            result = response
+            return self:_ExecuteAction(ctx, state, "REASON")
         end
-    elseif action == "DECOMPOSE" then
-        -- For now, just delegate to REASON
-        -- TODO: Implement actual decomposition
-        return self:_ExecuteAction(ctx, state, "REASON")
-    elseif action == "RETRIEVE" then
-        -- For now, just delegate to REASON
-        -- TODO: Implement tool delegation
-        return self:_ExecuteAction(ctx, state, "REASON")
-    elseif action == "SYNTHESIZE" then
-        -- For now, just delegate to REASON
-        return self:_ExecuteAction(ctx, state, "REASON")
-    elseif action == "VERIFY" then
-        -- For now, just delegate to REASON
-        return self:_ExecuteAction(ctx, state, "REASON")
-    else
-        -- Unknown action, fallback to REASON
-        return self:_ExecuteAction(ctx, state, "REASON")
+    end)
+
+    if not ok then
+        -- Error occurred, return empty result
+        return {
+            answer = nil,
+            confidence = 0.1,
+            error = result
+        }
     end
 
-    return result or {}
+    -- Parse response to extract answer
+    if type(result) == "table" and result.content then
+        return self:_ParseLLMResponse(result.content)
+    else
+        return result or {}
+    end
 end
 
 function ACE:_ParseLLMResponse(content)
