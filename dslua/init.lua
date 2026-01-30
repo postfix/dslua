@@ -17,8 +17,11 @@ M.Tool = require("dslua.tools.base")
 M.ToolRegistry = require("dslua.tools.registry")
 
 -- Agents
+M.agents = require("dslua.agents")
 M.BaseAgent = require("dslua.agents.base")
 M.ReActAgent = require("dslua.agents.react_agent")
+M.ACE = require("dslua.agents.ace")
+M.ACERules = require("dslua.agents.ace_rules")
 
 -- Optimizers
 M.BaseOptimizer = require("dslua.optimizers.base")
