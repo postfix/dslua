@@ -1,10 +1,10 @@
 # ACE Phase 2: Learning from Demonstrations - Design Document
 
-**Status:** Design v1.1 (Reviewed) | Implementation Pending
+**Status:** Design v1.2 (Final) | Implementation Ready
 
 **Created:** 2026-01-30
 
-**Last Updated:** 2026-01-30 (Addressed review feedback)
+**Last Updated:** 2026-01-30 (Final cleanup: Lua syntax, consistency fixes)
 
 **Goal:** Enable ACE to learn from demonstration traces by updating rule weights to match expert behavior, while keeping thresholds fixed for stability.
 
@@ -1193,6 +1193,26 @@ demos/
 ---
 
 ## Appendix 0: Revision History
+
+### v1.2 (2026-01-30) - Final Cleanup
+
+**Overview:** Addressed all remaining Lua syntax issues, inconsistencies, and spec precision gaps. Document is now implementation-ready.
+
+**Cleanup Items (6 total):**
+
+1. **Fixed tie-breaking contradiction** - Distinguished "all scores = 0" (fallback to REASON) vs "non-zero tie" (use priority order)
+2. **Converted all examples to valid Lua** - Fixed JSON arrays `[...]` → Lua tables `{...}`, fixed `1_000_000` → `1000000` (LuaJIT compatible)
+3. **Restructured metrics as single valid Lua table** - Put confusion summary stats inside table structure
+4. **Added margin units documentation** - Explained "score units", scale context (0.05 ≈ 0.8% of max score), invariance to normalization
+5. **Clarified coverage failure** - Explicit statement: "Phase 2 cannot invent new rules; rule authoring is manual TODO"
+6. **Fixed all code blocks** - All examples now copy-pasteable into Lua tests
+
+**Validation:**
+- ✅ All Lua examples valid LuaJIT 5.1
+- ✅ No conflicting algorithm descriptions
+- ✅ Tie-breaking fully specified and non-contradictory
+- ✅ Metrics export is single valid tree
+- ✅ Ready for implementation
 
 ### v1.1 (2026-01-30) - Critical Review Feedback Addressed
 
