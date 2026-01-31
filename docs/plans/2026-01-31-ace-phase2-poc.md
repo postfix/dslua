@@ -152,7 +152,8 @@ end
 -- @param rules table Array of rules
 -- @param weights table Weight lookup
 -- @param ACTIONS_ORDER table Fixed iteration order
--- @return table scores[action], per_action_matches[action]
+-- @return table scores[action], table per_action_matches[action]
+-- @note Returns TWO values: scores first, then matches (callers typically use only scores)
 -- @note Tie-breaking: argmax uses ACTIONS_ORDER priority (first max wins)
 -- @note Epsilon-band: actions with score >= best - eps, ordered by ACTIONS_ORDER
 function Phase1Adapter:ScoreActions(state, rules, weights, ACTIONS_ORDER)
@@ -173,6 +174,29 @@ function Phase1Adapter:ScoreActions(state, rules, weights, ACTIONS_ORDER)
     return scores, per_action_matches
 end
 ```
+
+```lua
+--- Predict action from scores (deterministic tie-breaking)
+-- @param scores table action -> score
+-- @param ACTIONS_ORDER table Fixed iteration order
+-- @return string Predicted action
+function Phase1Adapter:PredictAction(scores, ACTIONS_ORDER)
+    local best_action = ACTIONS_ORDER[1]  -- Default to first
+    local best_score = nil
+
+    for _, action in ipairs(ACTIONS_ORDER) do
+        local s = scores[action] or 0
+        if best_score == nil or s > best_score then
+            best_score = s
+            best_action = action
+        end
+    end
+
+    return best_action
+end
+```
+
+**Tie-Breaking Invariant:** Uses `>` not `>=` when comparing scores. First action in `ACTIONS_ORDER` wins ties (keeps prediction deterministic).
 
 **Isolation Boundary (Enforced):**
 
@@ -457,13 +481,32 @@ end
 - `self.prev_action`: string or null
 
 **Normalization Rules (POC Strict):**
-- Reject if any `task.*` numeric field not in [0,1]
-- Reject if `self.confidence` not in [0,1]
+
+**Required Fields (must be present):**
+- `task.task_type` (string)
+- `task.complexity_estimate` (number in [0,1])
+- `self.steps_taken` (integer ≥ 0, **not normalized**)
+- `self.confidence` (number in [0,1])
+- `decision.step` (integer ≥ 0)
+- `decision.demonstrated_action` (string in `ACTIONS_ORDER`)
+
+**Optional Fields (with defaults if missing):**
+- `task.input_length` → defaults to `0.0`
+- `task.entity_count` → defaults to `0.0`
+- `task.tool_requirements` → defaults to `{}`
+- `self.prev_action` → defaults to `nil` (null in JSON, nil in Lua after decode)
+
+**Validation Rules:**
+- Reject if any required field is missing
+- Reject if any required numeric field not in [0,1]
 - Reject if `self.steps_taken` < 0
-- Reject if `step` not monotonic increasing
+- Reject if `step` not monotonic increasing (`step[i] < step[i+1]`)
 - Reject if `demonstrated_action` not in `ACTIONS_ORDER`
-- **Missing numeric fields are rejected** (POC strict mode)
-- Missing `task.tool_requirements` defaults to `{}` (only allowed default)
+- **Note:** `prev_action` is `null` in JSON, becomes `nil` in Lua tables after dkjson decode. Validator accepts both representations.
+
+**Tie-Breaking Invariant (Critical for PredictAction):**
+- Uses `>` not `>=` when comparing scores
+- First action in `ACTIONS_ORDER` wins ties (keeps prediction deterministic)
 
 ---
 
@@ -473,6 +516,7 @@ end
 
 ```lua
 local RULES = {
+    -- Rule 1: Math → Use Calculator (Demo 1 target)
     {
         id = "math_use_calculator",
         key = "math_use_calculator",
@@ -483,6 +527,8 @@ local RULES = {
         action = "RETRIEVE",
         default_weight = 0.8
     },
+
+    -- Rule 2: Factual + High Confidence → Reason Direct (Demo 2 part A)
     {
         id = "factual_reason_direct",
         key = "factual_reason_direct",
@@ -491,8 +537,10 @@ local RULES = {
             {"confidence", ">", 0.5}
         },
         action = "REASON",
-        default_weight = 0.7
+        default_weight = 0.700  -- Safely inside epsilon band
     },
+
+    -- Rule 3: Factual + Entities → Use Search (Demo 2 part B, epsilon-band partner)
     {
         id = "factual_use_search",
         key = "factual_use_search",
@@ -501,8 +549,10 @@ local RULES = {
             {"entity_count", ">", 0.3}
         },
         action = "RETRIEVE",
-        default_weight = 0.69  -- Within epsilon of factual_reason_direct
+        default_weight = 0.695  -- Within epsilon=0.01 (0.700 - 0.695 = 0.005 < 0.01)
     },
+
+    -- Rule 4: General + High Complexity → Retrieve (Demo 3 competitor)
     {
         id = "general_retrieve_when_complex",
         key = "general_retrieve_when_complex",
@@ -513,10 +563,14 @@ local RULES = {
         action = "RETRIEVE",
         default_weight = 0.8
     },
+
+    -- Rule 5: General + Low Confidence → Fallback Reason (Demo 3 demonstrated action)
+    -- FIXED: Scoped to "general" only to prevent matching Demo 1
     {
         id = "fallback_reason",
         key = "fallback_reason",
         conditions = {
+            {"task_type", "==", "general"},  -- CRITICAL: Prevents matching Demo 1
             {"confidence", "<", 0.5}
         },
         action = "REASON",
@@ -529,9 +583,10 @@ return RULES
 
 **Critical Rule Design Decisions:**
 1. **NO unconditional fallback rule** - Prevents false positives in "no competitor" demo
-2. **Epsilon-band pair** - `factual_reason_direct` (0.7) and `factual_use_search` (0.69) create scores within epsilon=0.01
-3. **Margin saturation pair** - `general_retrieve_when_complex` (0.8) vs `fallback_reason` (0.3) creates large negative margin
-4. **No VERIFY rules** - Guarantees "coverage failure" demo triggers correctly
+2. **Rule 5 scoped to "general"** - `fallback_reason` only matches when `task_type="general"`, ensuring Demo 1 (math, confidence=0.3) has no competitors
+3. **Epsilon-band pair** - `factual_reason_direct` (0.700) and `factual_use_search` (0.695) create scores within epsilon=0.01 (gap = 0.005, safely inside band)
+4. **Margin saturation pair** - `general_retrieve_when_complex` (0.8) vs `fallback_reason` (0.3) creates large negative margin
+5. **No VERIFY rules** - Guarantees "coverage failure" demo triggers correctly
 
 ---
 
@@ -548,14 +603,21 @@ return RULES
       "task": {
         "task_type": "math",
         "complexity_estimate": 0.2,
+        "input_length": 0.3,
+        "entity_count": 0.0,
         "tool_requirements": ["calculator"]
       },
-      "self": {"confidence": 0.3, "steps_taken": 0, "prev_action": null}
+      "self": {
+        "confidence": 0.3,
+        "steps_taken": 0,
+        "prev_action": null
+      }
     }
   }],
   "outcome": {"success": true, "termination_reason": "SUCCESS", "steps_taken": 1}
 }
 ```
+**Expected:** Only `math_use_calculator` matches, other actions score 0 → true no-competitor case (Rule 5 doesn't match because `task_type != "general"`)
 **Expected:** Only `math_use_calculator` matches, other actions = 0 → `score_comp = 0` → increase-only update
 
 **Demo 2: Epsilon-Band Competitor Case**
@@ -568,16 +630,21 @@ return RULES
     "state_snapshot": {
       "task": {
         "task_type": "factual",
-        "entity_count": 0.4,
-        "complexity_estimate": 0.3
+        "complexity_estimate": 0.3,
+        "input_length": 0.5,
+        "entity_count": 0.4
       },
-      "self": {"confidence": 0.7, "steps_taken": 0, "prev_action": null}
+      "self": {
+        "confidence": 0.7,
+        "steps_taken": 0,
+        "prev_action": null
+      }
     }
   }],
   "outcome": {"success": true, "termination_reason": "SUCCESS", "steps_taken": 1}
 }
 ```
-**Expected:** Both `factual_reason_direct` (0.7) and `factual_use_search` (0.69) match → epsilon-band includes both
+**Expected:** Both `factual_reason_direct` (0.700) and `factual_use_search` (0.695) match → scores within epsilon=0.01 → epsilon-band includes both
 
 **Demo 3: Margin Saturation + Clamp Case**
 ```json
@@ -661,6 +728,37 @@ describe("ACE Phase 2 POC - Learning Algorithm", function()
         assert.is_equal("VERIFY", metrics.demonstrated_action)
         -- No weights should change
         assert.is_same(weights, initial_weights)
+    end)
+
+    it("all scores zero predicts REASON (fallback tie-breaking)", function()
+        -- Create state where NO rules match (all scores 0)
+        local empty_state = {
+            task = {
+                task_type = "unknown_type",  -- No rules match this
+                complexity_estimate = 0.5,
+                input_length = 0.0,
+                entity_count = 0.0
+            },
+            self = {
+                confidence = 0.5,
+                steps_taken = 0,
+                prev_action = nil
+            }
+        }
+
+        -- Compute scores (returns two values: scores, matches)
+        local scores, matches = adapter:ScoreActions(
+            empty_state, rules, weights, ACTIONS_ORDER
+        )
+
+        -- All scores should be 0
+        for action, score in pairs(scores) do
+            assert.is_equal(0, score, string.format("Action %s should have score 0", action))
+        end
+
+        -- Prediction should be REASON (first in ACTIONS_ORDER)
+        local predicted = adapter:PredictAction(scores, ACTIONS_ORDER)
+        assert.is_equal("REASON", predicted, "All-zero scores should fallback to first action in ACTIONS_ORDER")
     end)
 
     it("all action iteration is deterministic", function()
