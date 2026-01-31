@@ -51,4 +51,74 @@ function Phase1Adapter:NormalizeState(snapshot)
     return snapshot
 end
 
+function Phase1Adapter:ComputeSalience(rule, state, opts)
+    local mode = opts.salience_mode or "binary"
+    local diag = {mode = mode, coerced = false, raw = nil}
+
+    if mode == "binary" then
+        local raw = self:_RuleMatches(rule, state) and 1.0 or 0.0
+        diag.raw = raw
+        return raw, diag
+    end
+
+    if mode == "threshold" then
+        local raw = self:_ContinuousSalience(rule, state)
+        diag.raw = raw
+        local threshold = opts.salience_threshold or 0.5
+        local s = (raw >= threshold) and 1.0 or 0.0
+        diag.coerced = (raw ~= s)
+        return s, diag
+    end
+
+    error("Invalid salience_mode")
+end
+
+function Phase1Adapter:_RuleMatches(rule, state)
+    for _, condition in ipairs(rule.conditions) do
+        local feature_name = condition[1]
+        local op = condition[2]
+        local expected = condition[3]
+
+        if not self:_ConditionMatches(state, feature_name, op, expected) then
+            return false
+        end
+    end
+    return true
+end
+
+function Phase1Adapter:_ConditionMatches(state, feature_name, op, expected)
+    -- Find feature value in state (search task and self layers)
+    local feature_value = nil
+
+    if state.task and state.task[feature_name] ~= nil then
+        feature_value = state.task[feature_name]
+    elseif state.self and state.self[feature_name] ~= nil then
+        feature_value = state.self[feature_name]
+    end
+
+    if feature_value == nil then
+        return false
+    end
+
+    if op == "==" then
+        return feature_value == expected
+    elseif op == ">" then
+        return feature_value > expected
+    elseif op == "<" then
+        return feature_value < expected
+    elseif op == ">=" then
+        return feature_value >= expected
+    elseif op == "<=" then
+        return feature_value <= expected
+    else
+        return false
+    end
+end
+
+function Phase1Adapter:_ContinuousSalience(rule, state)
+    -- Placeholder for Phase 3 continuous salience
+    -- For Phase 2 POC, just return binary result
+    return self:_RuleMatches(rule, state) and 1.0 or 0.0
+end
+
 return Phase1Adapter

@@ -69,3 +69,99 @@ describe("Phase1DecisionAdapter - NormalizeState", function()
         assert.is_equal(state1.self.confidence, state2.self.confidence)
     end)
 end)
+
+describe("Phase1DecisionAdapter - ComputeSalience", function()
+    local Phase1Adapter
+
+    setup(function()
+        Phase1Adapter = require("poc.phase1_adapter")
+    end)
+
+    it("should return salience 1.0 when rule matches state", function()
+        local rule = {
+            id = "test_rule",
+            key = "test_rule",
+            conditions = {
+                {"task_type", "==", "math"},
+                {"complexity_estimate", "<", 0.5}
+            }
+        }
+
+        local state = {
+            task = {task_type = "math", complexity_estimate = 0.2},
+            self = {confidence = 0.5, steps_taken = 0}
+        }
+
+        local adapter = Phase1Adapter.new()
+        local salience, diag = adapter:ComputeSalience(rule, state, {salience_mode = "binary"})
+
+        assert.is_equal(1.0, salience)
+        assert.is_equal("binary", diag.mode)
+        assert.is_false(diag.coerced)
+        assert.is_equal(1.0, diag.raw)
+    end)
+
+    it("should return salience 0.0 when rule does not match state", function()
+        local rule = {
+            id = "test_rule",
+            key = "test_rule",
+            conditions = {
+                {"task_type", "==", "factual"}
+            }
+        }
+
+        local state = {
+            task = {task_type = "math", complexity_estimate = 0.2},
+            self = {confidence = 0.5, steps_taken = 0}
+        }
+
+        local adapter = Phase1Adapter.new()
+        local salience, diag = adapter:ComputeSalience(rule, state, {salience_mode = "binary"})
+
+        assert.is_equal(0.0, salience)
+        assert.is_equal("binary", diag.mode)
+        assert.is_false(diag.coerced)
+        assert.is_equal(0.0, diag.raw)
+    end)
+
+    it("should evaluate all conditions with AND logic", function()
+        local rule = {
+            id = "test_rule",
+            key = "test_rule",
+            conditions = {
+                {"task_type", "==", "math"},
+                {"complexity_estimate", "<", 0.5},
+                {"confidence", ">", 0.3}
+            }
+        }
+
+        -- All conditions match
+        local state_match = {
+            task = {task_type = "math", complexity_estimate = 0.2},
+            self = {confidence = 0.5, steps_taken = 0}
+        }
+
+        local adapter = Phase1Adapter.new()
+        local salience1 = adapter:ComputeSalience(rule, state_match, {salience_mode = "binary"})
+        assert.is_equal(1.0, salience1)
+
+        -- One condition fails
+        local state_fail = {
+            task = {task_type = "math", complexity_estimate = 0.6},  -- >= 0.5
+            self = {confidence = 0.5, steps_taken = 0}
+        }
+
+        local salience2 = adapter:ComputeSalience(rule, state_fail, {salience_mode = "binary"})
+        assert.is_equal(0.0, salience2)
+    end)
+
+    it("should error on invalid salience_mode", function()
+        local rule = {id = "test", key = "test", conditions = {}}
+        local state = {task = {}, self = {}}
+        local adapter = Phase1Adapter.new()
+
+        assert.has_error(function()
+            adapter:ComputeSalience(rule, state, {salience_mode = "invalid"})
+        end, "Invalid salience_mode")
+    end)
+end)
