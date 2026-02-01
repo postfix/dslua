@@ -1,0 +1,15 @@
+{
+  "demo_id": "poc_margin_saturation_001",
+  "decisions": [{
+    "step": 0,
+    "demonstrated_action": "REASON",
+    "state_snapshot": {
+      "task": {
+        "task_type": "general",
+        "complexity_estimate": 0.9
+      },
+      "self": {"confidence": 0.1, "steps_taken": 0, "prev_action": null}
+    }
+  }],
+  "outcome": {"success": true, "termination_reason": "SUCCESS", "steps_taken": 1}
+}

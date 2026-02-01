@@ -1,0 +1,21 @@
+{
+  "demo_id": "poc_epsilon_band_001",
+  "decisions": [{
+    "step": 0,
+    "demonstrated_action": "REASON",
+    "state_snapshot": {
+      "task": {
+        "task_type": "factual",
+        "complexity_estimate": 0.3,
+        "input_length": 0.5,
+        "entity_count": 0.4
+      },
+      "self": {
+        "confidence": 0.7,
+        "steps_taken": 0,
+        "prev_action": null
+      }
+    }
+  }],
+  "outcome": {"success": true, "termination_reason": "SUCCESS", "steps_taken": 1}
+}
