@@ -97,12 +97,13 @@ describe("ACE Rule Matching", function()
     it("should match rules with simple equality conditions", function()
         local rules = {
             {
+                key = "test_rule",
                 name = "test_rule",
                 conditions = {
-                    task_type = {op = "==", value = "math"}
+                    {feature = "task_type", op = "==", value = "math"}
                 },
                 action = "USE_CALCULATOR",
-                weight = 0.9,
+                default_weight = 0.9,
                 id = 1
             }
         }
@@ -121,12 +122,13 @@ describe("ACE Rule Matching", function()
     it("should match rules with greater-than conditions", function()
         local rules = {
             {
+                key = "complexity_rule",
                 name = "complexity_rule",
                 conditions = {
-                    complexity_estimate = {op = ">", threshold = 0.7}
+                    {feature = "complexity_estimate", op = ">", threshold = 0.7}
                 },
                 action = "DECOMPOSE",
-                weight = 0.8,
+                default_weight = 0.8,
                 id = 2
             }
         }
@@ -144,12 +146,13 @@ describe("ACE Rule Matching", function()
     it("should match rules with less-than conditions", function()
         local rules = {
             {
+                key = "confidence_rule",
                 name = "confidence_rule",
                 conditions = {
-                    confidence = {op = "<", threshold = 0.6}
+                    {feature = "confidence", op = "<", threshold = 0.6}
                 },
                 action = "VERIFY",
-                weight = 0.7,
+                default_weight = 0.7,
                 id = 3
             }
         }
@@ -167,12 +170,13 @@ describe("ACE Rule Matching", function()
     it("should not match rules that fail conditions", function()
         local rules = {
             {
+                key = "high_complexity",
                 name = "high_complexity",
                 conditions = {
-                    complexity_estimate = {op = ">", threshold = 0.7}
+                    {feature = "complexity_estimate", op = ">", threshold = 0.7}
                 },
                 action = "DECOMPOSE",
-                weight = 0.8,
+                default_weight = 0.8,
                 id = 4
             }
         }
@@ -190,10 +194,11 @@ describe("ACE Rule Matching", function()
     it("should score rules by weight × salience", function()
         local rules = {
             {
+                key = "strong_match",
                 name = "strong_match",
-                conditions = {confidence = {op = "<", threshold = 0.6}},
+                conditions = {{feature = "confidence", op = "<", threshold = 0.6}},
                 action = "VERIFY",
-                weight = 0.9,
+                default_weight = 0.9,
                 id = 5
             }
         }
@@ -231,8 +236,8 @@ describe("ACE Action Selection", function()
 
     it("should select highest-scoring action", function()
         local rules = {
-            {action = "DECOMPOSE", weight = 0.9, id = 1, conditions = {}},
-            {action = "ANSWER", weight = 0.6, id = 2, conditions = {}}
+            {key = "test_decompose", action = "DECOMPOSE", default_weight = 0.9, id = 1, conditions = {}},
+            {key = "test_answer", action = "ANSWER", default_weight = 0.6, id = 2, conditions = {}}
         }
 
         local state = {task = {}, self = {}, history = {}}
@@ -252,8 +257,8 @@ describe("ACE Action Selection", function()
 
     it("should break ties by recency (higher ID)", function()
         local rules = {
-            {action = "OLD", weight = 0.8, id = 1, conditions = {}},
-            {action = "NEW", weight = 0.8, id = 10, conditions = {}}
+            {key = "test_old", action = "OLD", default_weight = 0.8, id = 1, conditions = {}},
+            {key = "test_new", action = "NEW", default_weight = 0.8, id = 10, conditions = {}}
         }
 
         local state = {task = {}, self = {}, history = {}}
@@ -264,8 +269,8 @@ describe("ACE Action Selection", function()
 
     it("should record decision with competing alternatives", function()
         local rules = {
-            {action = "WIN", weight = 0.9, id = 1, conditions = {}},
-            {action = "LOSE", weight = 0.7, id = 2, conditions = {}}
+            {key = "test_win", action = "WIN", default_weight = 0.9, id = 1, conditions = {}},
+            {key = "test_lose", action = "LOSE", default_weight = 0.7, id = 2, conditions = {}}
         }
 
         local state = {task = {}, self = {}, history = {}}
@@ -299,7 +304,7 @@ describe("ACE Execution Loop", function()
         module:WithLLM(mock_llm)
 
         local rules = {
-            {action = "REASON", weight = 0.9, id = 1, conditions = {}}
+            {key = "test_reason", action = "REASON", default_weight = 0.9, id = 1, conditions = {}}
         }
 
         local ace = ACE.new(module, {rules = rules})
@@ -327,7 +332,7 @@ describe("ACE Execution Loop", function()
         module:WithLLM(mock_llm)
 
         local rules = {
-            {action = "REASON", weight = 0.9, id = 1, conditions = {}}
+            {key = "test_reason", action = "REASON", default_weight = 0.9, id = 1, conditions = {}}
         }
 
         local ace = ACE.new(module, {rules = rules, max_steps = 5})
@@ -354,7 +359,7 @@ describe("ACE Execution Loop", function()
         }
 
         local rules = {
-            {action = "DECOMPOSE", weight = 0.9, id = 1, conditions = {}}
+            {key = "test_decompose", action = "DECOMPOSE", default_weight = 0.9, id = 1, conditions = {}}
         }
 
         local ace = ACE.new(module, {rules = rules, max_steps = 3})
@@ -381,7 +386,7 @@ describe("ACE Execution Loop", function()
         module:WithLLM(mock_llm)
 
         local rules = {
-            {action = "TERMINATE", weight = 0.9, id = 1, conditions = {}}
+            {key = "test_terminate", action = "TERMINATE", default_weight = 0.9, id = 1, conditions = {}}
         }
 
         local ace = ACE.new(module, {rules = rules})

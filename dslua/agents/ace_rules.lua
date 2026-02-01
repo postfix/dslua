@@ -1,70 +1,76 @@
 local default_rules = {
-    -- Complex tasks → Decompose
+    -- Math tasks → Use calculator
     {
-        name = "complex_decomposition",
+        key = "math_calculator",
+        name = "math_calculator",
         conditions = {
-            input_length = {op = ">", threshold = 0.7},
-            complexity_estimate = {op = ">", threshold = 0.6}
+            {feature = "task_type", op = "==", value = "math"}
         },
-        action = "DECOMPOSE",
-        weight = 0.9,
+        action = "RETRIEVE",
+        default_weight = 0.95,
         id = 1
     },
 
     -- Factual + low confidence → Retrieve
     {
+        key = "factual_retrieval",
         name = "factual_retrieval",
         conditions = {
-            task_type = {op = "==", value = "factual"},
-            confidence = {op = "<", threshold = 0.6},
-            entity_count = {op = ">", threshold = 0.3}
+            {feature = "task_type", op = "==", value = "factual"},
+            {feature = "confidence", op = "<", threshold = 0.6},
+            {feature = "entity_count", op = ">", threshold = 0.3}
         },
         action = "RETRIEVE",
-        weight = 0.85,
+        default_weight = 0.85,
         id = 2
     },
 
-    -- Math tasks → Use calculator
+    -- Complex tasks → Decompose
     {
-        name = "math_calculator",
+        key = "complex_decomposition",
+        name = "complex_decomposition",
         conditions = {
-            task_type = {op = "==", value = "math"}
+            {feature = "input_length", op = ">", threshold = 0.7},
+            {feature = "complexity_estimate", op = ">", threshold = 0.6}
         },
-        action = "RETRIEVE",  -- RETRIEVE will delegate to calculator
-        weight = 0.95,
+        action = "DECOMPOSE",
+        default_weight = 0.9,
         id = 3
     },
 
     -- High confidence → Answer directly
     {
+        key = "confident_direct_answer",
         name = "confident_direct_answer",
         conditions = {
-            confidence = {op = ">", threshold = 0.8},
-            complexity_estimate = {op = "<", threshold = 0.5}
+            {feature = "confidence", op = ">", threshold = 0.8},
+            {feature = "complexity_estimate", op = "<", threshold = 0.5}
         },
         action = "REASON",
-        weight = 0.8,
+        default_weight = 0.8,
         id = 4
     },
 
     -- After synthesis → Verify
     {
+        key = "post_synthesis_verify",
         name = "post_synthesis_verify",
         conditions = {
-            current_action = {op = "==", value = "SYNTHESIZE"},
-            confidence = {op = "<", threshold = 0.7}
+            {feature = "current_action", op = "==", value = "SYNTHESIZE"},
+            {feature = "confidence", op = "<", threshold = 0.7}
         },
         action = "VERIFY",
-        weight = 0.75,
+        default_weight = 0.75,
         id = 5
     },
 
     -- Default fallback (always matches)
     {
+        key = "default_reason_terminate",
         name = "default_reason_terminate",
         conditions = {},  -- No conditions = always matches
         action = "REASON",
-        weight = 0.2,  -- Low weight, only activates if no better match
+        default_weight = 0.2,  -- Low weight, only activates if no better match
         id = 999
     }
 }

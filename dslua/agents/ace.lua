@@ -1,4 +1,5 @@
 local BaseAgent = require("dslua.agents.base")
+local Decision = require("dslua.agents.ace_decision")
 
 local ACE = {}
 ACE.__index = ACE
@@ -16,6 +17,12 @@ function ACE.new(module, opts)
         max_steps = opts.max_steps or 10,
         log_decisions = opts.log_decisions or false
     }
+
+    -- Initialize weights table
+    self._weights = {}
+    for _, rule in ipairs(self._rules) do
+        self._weights[rule.key] = rule.default_weight
+    end
 
     -- Initialize history storage
     self._history = {
@@ -117,7 +124,7 @@ function ACE:_FindMatchingRules(state, rules)
     local matches = {}
 
     for _, rule in ipairs(rules) do
-        if self:_RuleMatches(rule, state) then
+        if Decision._RuleMatches(rule, state) then  -- Changed from self:_RuleMatches
             table.insert(matches, rule)
         end
     end
@@ -125,75 +132,105 @@ function ACE:_FindMatchingRules(state, rules)
     return matches
 end
 
-function ACE:_RuleMatches(rule, state)
-    for feature_name, condition in pairs(rule.conditions) do
-        if not self:_ConditionMatches(condition, state, feature_name) then
-            return false
-        end
-    end
-    return true
-end
-
-function ACE:_ConditionMatches(condition, state, feature_name)
-    -- Find feature value in state (search across task, self, history)
-    local feature_value = self:_GetFeatureValue(state, feature_name)
-    if feature_value == nil then
-        return false
-    end
-
-    local op = condition.op
-    local threshold = condition.threshold
-    local value = condition.value
-
-    if op == "==" then
-        return feature_value == value
-    elseif op == ">" then
-        return feature_value > threshold
-    elseif op == "<" then
-        return feature_value < threshold
-    elseif op == ">=" then
-        return feature_value >= threshold
-    elseif op == "<=" then
-        return feature_value <= threshold
-    else
-        return false
-    end
-end
-
-function ACE:_GetFeatureValue(state, feature_name)
-    -- Search in task layer
-    if state.task[feature_name] ~= nil then
-        return state.task[feature_name]
-    end
-
-    -- Search in self layer
-    if state.self[feature_name] ~= nil then
-        return state.self[feature_name]
-    end
-
-    -- Search in history layer (for historical success rates)
-    if state.history[feature_name] ~= nil then
-        return state.history[feature_name]
-    end
-
-    return nil
-end
+-- Remove old _RuleMatches, _ConditionMatches, _GetFeatureValue methods
+-- (Now in ace_decision.lua)
 
 function ACE:_ScoreRules(rules, state)
     local scores = {}
 
     for _, rule in ipairs(rules) do
         local salience = self:_ComputeSalience(rule, state)
-        scores[rule] = rule.weight * salience
+        local weight = self._weights[rule.key] or rule.default_weight
+        scores[rule] = weight * salience
     end
 
     return scores
 end
 
-function ACE:_ComputeSalience(rule, state)
-    -- Simple salience: how strongly conditions are satisfied
-    -- For now, use a constant; can be enhanced later
-    return 1.0
+function ACE:_ComputeSalience(rule, state, opts)
+    return Decision.ComputeSalience(rule, state, opts or {salience_mode = "binary"})
+end
+
+function ACE:LearnFromDemonstration(decision, opts)
+    opts = opts or {}
+    local learning = require("dslua.agents.ace_learning")
+
+    -- Set defaults
+    opts.learning_rate = opts.learning_rate or 0.05
+    opts.max_weight_delta = opts.max_weight_delta or 0.02
+    opts.min_margin = opts.min_margin or 0.05
+    opts.epsilon = opts.epsilon or 0.01
+    opts.salience_mode = opts.salience_mode or "binary"
+
+    -- Initialize weights table if needed
+    if not self._weights then
+        self._weights = {}
+        for _, rule in ipairs(self._rules) do
+            self._weights[rule.key] = rule.default_weight
+        end
+    end
+
+    return learning.LearnFromDemonstration(
+        decision,
+        self._rules,
+        self._weights,
+        opts,
+        Decision.NormalizeState,
+        {"REASON", "RETRIEVE", "DECOMPOSE", "SYNTHESIZE", "VERIFY", "TERMINATE"}
+    )
+end
+
+function ACE:ExportLearnedWeights(filepath)
+    local persistence = require("dslua.agents.ace_persistence")
+    return persistence.ExportLearnedWeights(filepath, self._rules, self._weights)
+end
+
+function ACE:LoadWeightOverrides(filepath)
+    local persistence = require("dslua.agents.ace_persistence")
+    local overrides, err = persistence.LoadWeightOverrides(filepath, self._rules)
+
+    if err then
+        return false, err
+    end
+
+    -- Merge overrides with existing weights
+    for key, weight in pairs(overrides) do
+        self._weights[key] = weight
+    end
+
+    return true, nil
+end
+
+function ACE:TrainFromDemos(demos, opts)
+    local training = require("dslua.agents.ace_training")
+    local result = training.TrainFromDemos(demos, self._rules, opts)
+
+    -- Update ACE weights with trained weights
+    for key, weight in pairs(result.trained_weights) do
+        self._weights[key] = weight
+    end
+
+    return result
+end
+
+function ACE:TrainFromDemoDirectory(directory, opts)
+    opts = opts or {}
+    local training = require("dslua.agents.ace_training")
+
+    -- Load demos
+    local demos, err = training.LoadDemos(directory, {
+        validate = true,
+        split_ratio = opts.split_ratio or 0.8,
+        shuffle = opts.shuffle ~= false,
+        seed = opts.seed
+    })
+
+    if err then
+        return nil, err
+    end
+
+    -- Train
+    return self:TrainFromDemos(demos, opts)
 end
 
 function ACE:_SelectAction(state, rules)

@@ -7,7 +7,11 @@ setmetatable(BootstrapFewShot, {__index = BaseOptimizer})
 
 function BootstrapFewShot.new(module, opts)
     opts = opts or {}
-    local self = BaseOptimizer.new(module, opts)
+    -- Pass valset as dataset to parent for evaluation
+    local parent_opts = {
+        dataset = opts.valset or opts.dataset or {}
+    }
+    local self = BaseOptimizer.new(module, parent_opts)
     setmetatable(self, BootstrapFewShot)
 
     self._trainset = opts.trainset or {}

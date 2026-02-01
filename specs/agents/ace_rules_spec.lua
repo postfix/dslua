@@ -12,7 +12,7 @@ describe("ACE Default Rules", function()
         for _, rule in ipairs(rules) do
             assert.is_not_nil(rule.name, "Rule should have name")
             assert.is_not_nil(rule.action, "Rule should have action")
-            assert.is_not_nil(rule.weight, "Rule should have weight")
+            assert.is_not_nil(rule.default_weight, "Rule should have default_weight")
             assert.is_not_nil(rule.conditions, "Rule should have conditions")
             assert.is_not_nil(rule.id, "Rule should have id")
         end
@@ -26,7 +26,7 @@ describe("ACE Default Rules", function()
             if rule.name == "complex_decomposition" then
                 found = true
                 assert.is.equal("DECOMPOSE", rule.action)
-                assert.is_true(rule.weight > 0.7, "Should have high weight")
+                assert.is_true(rule.default_weight > 0.7, "Should have high default_weight")
                 break
             end
         end
@@ -57,7 +57,7 @@ describe("ACE Default Rules", function()
             if rule.name == "default_reason_terminate" then
                 found = true
                 assert.is.equal("REASON", rule.action)
-                assert.is_true(rule.weight < 0.5, "Should have low weight")
+                assert.is_true(rule.default_weight < 0.5, "Should have low default_weight")
                 break
             end
         end
