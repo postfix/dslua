@@ -165,3 +165,161 @@ describe("Phase1DecisionAdapter - ComputeSalience", function()
         end, "Invalid salience_mode")
     end)
 end)
+
+describe("Phase1DecisionAdapter - FindMatchingRules", function()
+    local Phase1Adapter
+
+    setup(function()
+        Phase1Adapter = require("poc.phase1_adapter")
+    end)
+
+    it("should return all rules matching action with weight and salience", function()
+        local rules = {
+            {
+                id = "rule1",
+                key = "rule1",
+                conditions = {{"task_type", "==", "math"}},
+                action = "RETRIEVE",
+                default_weight = 0.8
+            },
+            {
+                id = "rule2",
+                key = "rule2",
+                conditions = {{"task_type", "==", "math"}, {"complexity_estimate", "<", 0.5}},
+                action = "REASON",
+                default_weight = 0.7
+            }
+        }
+
+        local weights = {rule1 = 0.8, rule2 = 0.7}
+        local state = {
+            task = {task_type = "math", complexity_estimate = 0.2},
+            self = {confidence = 0.5, steps_taken = 0}
+        }
+
+        local adapter = Phase1Adapter.new()
+
+        -- Find rules for RETRIEVE action
+        local retrieve_matches = adapter:FindMatchingRules(state, "RETRIEVE", rules, weights)
+        assert.is_equal(1, #retrieve_matches)
+        assert.is_equal("rule1", retrieve_matches[1].key)
+        assert.is_equal(0.8, retrieve_matches[1].weight)
+        assert.is_equal(1.0, retrieve_matches[1].salience)
+
+        -- Find rules for REASON action
+        local reason_matches = adapter:FindMatchingRules(state, "REASON", rules, weights)
+        assert.is_equal(1, #reason_matches)
+        assert.is_equal("rule2", reason_matches[1].key)
+    end)
+
+    it("should use default_weight when key not in weights table", function()
+        local rules = {
+            {
+                id = "rule1",
+                key = "rule1",
+                conditions = {{"task_type", "==", "math"}},
+                action = "RETRIEVE",
+                default_weight = 0.75
+            }
+        }
+
+        local weights = {}  -- Empty weights table
+        local state = {
+            task = {task_type = "math", complexity_estimate = 0.2},
+            self = {confidence = 0.5, steps_taken = 0}
+        }
+
+        local adapter = Phase1Adapter.new()
+        local matches = adapter:FindMatchingRules(state, "RETRIEVE", rules, weights)
+
+        assert.is_equal(1, #matches)
+        assert.is_equal(0.75, matches[1].weight)
+    end)
+
+    it("should error when rule has no weight and no default_weight", function()
+        local rules = {
+            {
+                id = "rule1",
+                key = "rule1",
+                conditions = {{"task_type", "==", "math"}},
+                action = "RETRIEVE"
+                -- No default_weight
+            }
+        }
+
+        local weights = {}
+        local state = {
+            task = {task_type = "math", complexity_estimate = 0.2},
+            self = {confidence = 0.5, steps_taken = 0}
+        }
+
+        local adapter = Phase1Adapter.new()
+
+        assert.has_error(function()
+            adapter:FindMatchingRules(state, "RETRIEVE", rules, weights)
+        end, "Missing weight for rule")
+    end)
+
+    it("should return empty array when no rules match", function()
+        local rules = {
+            {
+                id = "rule1",
+                key = "rule1",
+                conditions = {{"task_type", "==", "factual"}},
+                action = "REASON",
+                default_weight = 0.7
+            }
+        }
+
+        local weights = {rule1 = 0.7}
+        local state = {
+            task = {task_type = "math", complexity_estimate = 0.2},  -- Doesn't match
+            self = {confidence = 0.5, steps_taken = 0}
+        }
+
+        local adapter = Phase1Adapter.new()
+        local matches = adapter:FindMatchingRules(state, "REASON", rules, weights)
+
+        assert.is_equal(0, #matches)
+    end)
+
+    it("should preserve rules array order in returned matches", function()
+        local rules = {
+            {
+                id = "rule1",
+                key = "rule1",
+                conditions = {{"task_type", "==", "math"}},
+                action = "RETRIEVE",
+                default_weight = 0.8
+            },
+            {
+                id = "rule2",
+                key = "rule2",
+                conditions = {{"task_type", "==", "math"}},
+                action = "RETRIEVE",
+                default_weight = 0.7
+            },
+            {
+                id = "rule3",
+                key = "rule3",
+                conditions = {{"task_type", "==", "math"}},
+                action = "RETRIEVE",
+                default_weight = 0.6
+            }
+        }
+
+        local weights = {rule1 = 0.8, rule2 = 0.7, rule3 = 0.6}
+        local state = {
+            task = {task_type = "math", complexity_estimate = 0.2},
+            self = {confidence = 0.5, steps_taken = 0}
+        }
+
+        local adapter = Phase1Adapter.new()
+        local matches = adapter:FindMatchingRules(state, "RETRIEVE", rules, weights)
+
+        assert.is_equal(3, #matches)
+        assert.is_equal("rule1", matches[1].key)
+        assert.is_equal("rule2", matches[2].key)
+        assert.is_equal("rule3", matches[3].key)
+    end)
+end)

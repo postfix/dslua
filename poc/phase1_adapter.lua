@@ -121,4 +121,38 @@ function Phase1Adapter:_ContinuousSalience(rule, state)
     return self:_RuleMatches(rule, state) and 1.0 or 0.0
 end
 
+function Phase1Adapter:FindMatchingRules(state, action, rules, weights)
+    local matches = {}
+
+    for _, rule in ipairs(rules) do
+        -- Only check rules that target this action
+        if rule.action == action then
+            local salience, diag = self:ComputeSalience(rule, state, {salience_mode = "binary"})
+
+            if salience > 0 then
+                local key = rule.key or rule.id
+                local w = weights[key]
+
+                if w == nil then
+                    if rule.default_weight ~= nil then
+                        w = rule.default_weight
+                    else
+                        error("Missing weight for rule")
+                    end
+                end
+
+                table.insert(matches, {
+                    rule = rule,
+                    salience = salience,
+                    weight = w,
+                    salience_diag = diag,
+                    key = key
+                })
+            end
+        end
+    end
+
+    return matches
+end
+
 return Phase1Adapter
