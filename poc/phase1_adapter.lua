@@ -155,4 +155,22 @@ function Phase1Adapter:FindMatchingRules(state, action, rules, weights)
     return matches
 end
 
+function Phase1Adapter:ScoreActions(state, rules, weights, ACTIONS_ORDER)
+    local scores = {}
+    local per_action_matches = {}
+
+    for _, action in ipairs(ACTIONS_ORDER) do
+        local matches = self:FindMatchingRules(state, action, rules, weights)
+        per_action_matches[action] = matches
+
+        local score = 0
+        for _, pair in ipairs(matches) do
+            score = score + (pair.weight * pair.salience)
+        end
+        scores[action] = score
+    end
+
+    return scores, per_action_matches
+end
+
 return Phase1Adapter

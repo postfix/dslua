@@ -323,3 +323,132 @@ describe("Phase1DecisionAdapter - FindMatchingRules", function()
         assert.is_equal("rule3", matches[3].key)
     end)
 end)
+
+describe("Phase1DecisionAdapter - ScoreActions", function()
+    local Phase1Adapter
+
+    setup(function()
+        Phase1Adapter = require("poc.phase1_adapter")
+    end)
+
+    local ACTIONS_ORDER = {"REASON", "RETRIEVE", "DECOMPOSE", "SYNTHESIZE", "VERIFY", "TERMINATE"}
+
+    it("should compute scores for all actions deterministically", function()
+        local rules = {
+            {
+                id = "math_calc",
+                key = "math_calc",
+                conditions = {{"task_type", "==", "math"}},
+                action = "RETRIEVE",
+                default_weight = 0.8
+            },
+            {
+                id = "general_reason",
+                key = "general_reason",
+                conditions = {{"task_type", "==", "general"}},
+                action = "REASON",
+                default_weight = 0.7
+            }
+        }
+
+        local weights = {math_calc = 0.8, general_reason = 0.7}
+        local state = {
+            task = {task_type = "math", complexity_estimate = 0.2},
+            self = {confidence = 0.5, steps_taken = 0}
+        }
+
+        local adapter = Phase1Adapter.new()
+        local scores, per_action_matches = adapter:ScoreActions(state, rules, weights, ACTIONS_ORDER)
+
+        -- Check scores
+        assert.is_equal(0, scores["REASON"])  -- No matching rules
+        assert.is_equal(0.8, scores["RETRIEVE"])  -- math_calc matched
+        assert.is_equal(0, scores["DECOMPOSE"])
+        assert.is_equal(0, scores["SYNTHESIZE"])
+        assert.is_equal(0, scores["VERIFY"])
+        assert.is_equal(0, scores["TERMINATE"])
+
+        -- Check per-action matches
+        assert.is_equal(0, #per_action_matches["REASON"])
+        assert.is_equal(1, #per_action_matches["RETRIEVE"])
+        assert.is_equal("math_calc", per_action_matches["RETRIEVE"][1].key)
+    end)
+
+    it("should sum weights when multiple rules match same action", function()
+        local rules = {
+            {
+                id = "rule1",
+                key = "rule1",
+                conditions = {{"task_type", "==", "math"}},
+                action = "RETRIEVE",
+                default_weight = 0.6
+            },
+            {
+                id = "rule2",
+                key = "rule2",
+                conditions = {{"task_type", "==", "math"}, {"complexity_estimate", "<", 0.5}},
+                action = "RETRIEVE",
+                default_weight = 0.3
+            }
+        }
+
+        local weights = {rule1 = 0.6, rule2 = 0.3}
+        local state = {
+            task = {task_type = "math", complexity_estimate = 0.2},
+            self = {confidence = 0.5, steps_taken = 0}
+        }
+
+        local adapter = Phase1Adapter.new()
+        local scores = adapter:ScoreActions(state, rules, weights, ACTIONS_ORDER)
+
+        -- Both rules match RETRIEVE: 0.6 + 0.3 = 0.9
+        assert.is_near(0.9, scores["RETRIEVE"], 0.0001)
+    end)
+
+    it("should return two values: scores and per_action_matches", function()
+        local rules = {
+            {
+                id = "rule1",
+                key = "rule1",
+                conditions = {{"task_type", "==", "math"}},
+                action = "RETRIEVE",
+                default_weight = 0.8
+            }
+        }
+
+        local weights = {rule1 = 0.8}
+        local state = {
+            task = {task_type = "math", complexity_estimate = 0.2},
+            self = {confidence = 0.5, steps_taken = 0}
+        }
+
+        local adapter = Phase1Adapter.new()
+        local scores, per_action_matches = adapter:ScoreActions(state, rules, weights, ACTIONS_ORDER)
+
+        -- First return value is scores table
+        assert.is_not_nil(scores)
+        assert.is_not_nil(scores["RETRIEVE"])
+
+        -- Second return value is per_action_matches table
+        assert.is_not_nil(per_action_matches)
+        assert.is_not_nil(per_action_matches["RETRIEVE"])
+        assert.is_equal(1, #per_action_matches["RETRIEVE"])
+    end)
+
+    it("should iterate actions in ACTIONS_ORDER for determinism", function()
+        local rules = {}
+        local weights = {}
+        local state = {
+            task = {task_type = "unknown", complexity_estimate = 0.5},
+            self = {confidence = 0.5, steps_taken = 0}
+        }
+
+        local adapter = Phase1Adapter.new()
+        local scores = adapter:ScoreActions(state, rules, weights, ACTIONS_ORDER)
+
+        -- All scores should be 0 (no rules match)
+        for _, action in ipairs(ACTIONS_ORDER) do
+            assert.is_equal(0, scores[action], string.format("Action %s should have score 0", action))
+        end
+    end)
+end)
