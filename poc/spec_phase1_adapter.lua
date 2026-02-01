@@ -452,3 +452,89 @@ describe("Phase1DecisionAdapter - ScoreActions", function()
         end
     end)
 end)
+
+describe("Phase1DecisionAdapter - PredictAction", function()
+    local Phase1Adapter
+
+    setup(function()
+        Phase1Adapter = require("poc.phase1_adapter")
+    end)
+
+    local ACTIONS_ORDER = {"REASON", "RETRIEVE", "DECOMPOSE", "SYNTHESIZE", "VERIFY", "TERMINATE"}
+
+    it("should predict action with highest score", function()
+        local scores = {
+            REASON = 0.5,
+            RETRIEVE = 0.8,
+            DECOMPOSE = 0.3,
+            SYNTHESIZE = 0.2,
+            VERIFY = 0.1,
+            TERMINATE = 0.0
+        }
+
+        local adapter = Phase1Adapter.new()
+        local predicted = adapter:PredictAction(scores, ACTIONS_ORDER)
+
+        assert.is_equal("RETRIEVE", predicted)
+    end)
+
+    it("should use ACTIONS_ORDER priority for tie-breaking (first max wins)", function()
+        -- RETRIEVE and DECOMPOSE both have score 0.7
+        local scores = {
+            REASON = 0.5,
+            RETRIEVE = 0.7,
+            DECOMPOSE = 0.7,  -- Same score as RETRIEVE
+            SYNTHESIZE = 0.2,
+            VERIFY = 0.1,
+            TERMINATE = 0.0
+        }
+
+        local adapter = Phase1Adapter.new()
+        local predicted = adapter:PredictAction(scores, ACTIONS_ORDER)
+
+        -- RETRIEVE comes before DECOMPOSE in ACTIONS_ORDER, so RETRIEVE wins
+        assert.is_equal("RETRIEVE", predicted)
+    end)
+
+    it("should return first action when all scores are zero", function()
+        local scores = {
+            REASON = 0,
+            RETRIEVE = 0,
+            DECOMPOSE = 0,
+            SYNTHESIZE = 0,
+            VERIFY = 0,
+            TERMINATE = 0
+        }
+
+        local adapter = Phase1Adapter.new()
+        local predicted = adapter:PredictAction(scores, ACTIONS_ORDER)
+
+        assert.is_equal("REASON", predicted)  -- First in ACTIONS_ORDER
+    end)
+
+    it("should handle missing scores (treat as 0)", function()
+        local scores = {
+            RETRIEVE = 0.6
+            -- Other actions missing
+        }
+
+        local adapter = Phase1Adapter.new()
+        local predicted = adapter:PredictAction(scores, ACTIONS_ORDER)
+
+        assert.is_equal("RETRIEVE", predicted)
+    end)
+
+    it("should use > not >= for comparison (first max wins ties)", function()
+        local scores = {
+            REASON = 0.7,
+            RETRIEVE = 0.7,
+            DECOMPOSE = 0.6
+        }
+
+        local adapter = Phase1Adapter.new()
+        local predicted = adapter:PredictAction(scores, ACTIONS_ORDER)
+
+        -- REASON and RETRIEVE tied at 0.7, REASON wins (comes first)
+        assert.is_equal("REASON", predicted)
+    end)
+end)

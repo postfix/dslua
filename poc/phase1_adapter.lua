@@ -173,4 +173,19 @@ function Phase1Adapter:ScoreActions(state, rules, weights, ACTIONS_ORDER)
     return scores, per_action_matches
 end
 
+function Phase1Adapter:PredictAction(scores, ACTIONS_ORDER)
+    local best_action = ACTIONS_ORDER[1]  -- Default to first
+    local best_score = nil
+
+    for _, action in ipairs(ACTIONS_ORDER) do
+        local s = scores[action] or 0
+        if best_score == nil or s > best_score then
+            best_score = s
+            best_action = action
+        end
+    end
+
+    return best_action
+end
+
 return Phase1Adapter
