@@ -33,11 +33,11 @@ dslua is a native Lua implementation of the DSPy framework for building reliable
 - **409 tests passing** (100% pass rate)
 
 🚧 **In Progress:**
-- **ACE (Autonomous Cognitive Entity)** - Phase 1 MVP complete
+- **ACE (Autonomous Cognitive Entity)** - Phase 2 complete
   - ✅ Core decision engine with rule matching
   - ✅ Three-layer state representation
   - ✅ Hand-coded rule set
-  - ⏳ Learning from demonstrations (Phase 2)
+  - ✅ Learning from demonstrations (Phase 2)
   - ⏳ Pattern mining + outcome feedback (Phase 3)
 
 📋 **Planned:**
@@ -256,6 +256,68 @@ ACE automatically:
 - Uses calculator for math problems
 - Verifies results when confidence is low
 - Adapts execution strategy based on task features
+
+### Training ACE from Demonstrations
+
+ACE Phase 2 enables learning from demonstrations to improve decision-making:
+
+```lua
+local dslua = require("dslua")
+
+-- Create ACE with active learning mode
+local ace = dslua.ACE.new(module, {
+    rules = dslua.ACERules,
+    learning_mode = "active",  -- Enable learning
+    max_steps = 10
+})
+
+-- Train from demonstration files
+local training_result = ace:TrainFromDemoDirectory("demos/examples", {
+    epochs = 10,
+    learning_rate = 0.05,
+    max_weight_delta = 0.02,
+    early_stopping_patience = 3,
+    min_margin = 0.05,
+    seed = 42
+})
+
+print("Training complete!")
+print("Final loss:", training_result.final_loss)
+print("Epochs trained:", training_result.epochs_trained)
+
+-- Export learned weights
+local success = ace:ExportLearnedWeights("weights/ace_trained.json")
+if success then
+    print("Weights exported successfully")
+end
+```
+
+**Demonstration Format** (JSON traces):
+```json
+{
+  "state_snapshot": {
+    "task": {
+      "task_type": "math",
+      "complexity_estimate": 0.8,
+      "input_length": 20.0,
+      "entity_count": 2.0,
+      "tool_requirements": ["calculator"]
+    },
+    "self": {
+      "confidence": 0.3,
+      "steps_taken": 0
+    }
+  },
+  "demonstrated_action": "USE_CALCULATOR"
+}
+```
+
+**Training Features:**
+- **Margin-based learning:** Only updates weights when demonstrated action is insufficiently favored
+- **Bounded updates:** Respects `max_weight_delta` to prevent overfitting
+- **Epsilon-band handling:** Identifies and penalizes competing actions in score margin
+- **Early stopping:** Stops training when validation loss plateaus
+- **Weight persistence:** Export/import learned weights via JSON
 
 ### CLI
 

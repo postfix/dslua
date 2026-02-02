@@ -523,15 +523,22 @@ Each error type includes:
   - [x] Execution loop with delegation to modules
   - [x] Hand-coded rule set with 6 default rules
   - [x] Package exports and integration tests
-- [ ] **ACE Phase 2** - Learning from Demonstrations
+- [x] **ACE Phase 2** - Learning from Demonstrations (2026-02-02)
+  - [x] Decision module with pure functions (NormalizeState, ScoreActions, PredictAction)
+  - [x] Learning module with 12-step margin-based algorithm
+  - [x] Training loop with multi-epoch learning and early stopping
+  - [x] Weight persistence (JSON import/export)
+  - [x] Demo loading and validation (ACE trace format)
+  - [x] Integration with ACE agent (TrainFromDemoDirectory, ExportLearnedWeights, LoadWeightOverrides)
 - [ ] **ACE Phase 3** - Pattern Mining and Outcome Feedback
 
 **Results:**
-- 31 new tests added for ACE (100% pass rate)
-- Total: 172 tests passing (1 pre-existing failure in optimizers)
-- ACE agent successfully coordinates modules and tools
-- Rule-based decision making operational
-- Ready for Phase 2 (learning implementation)
+- 55 ACE tests passing (100% pass rate)
+- Total: 409 tests passing
+- ACE agent successfully learns from demonstrations
+- Margin-based learning with bounded updates
+- Weight persistence and loading operational
+- Ready for Phase 3 (pattern mining)
 
 ---
 
