@@ -1,0 +1,37 @@
+{
+  "demo_id": "math_complex_001",
+  "metadata": {
+    "task_difficulty": "medium",
+    "teacher_confidence": 0.90,
+    "tags": ["math", "complex", "calculator"]
+  },
+  "trace": [
+    {
+      "step": 0,
+      "demonstrated_action": "RETRIEVE",
+      "state_snapshot": {
+        "task": {
+          "task_type": "math",
+          "complexity_estimate": 0.55,
+          "input_length": 0.4,
+          "entity_count": 0.3,
+          "tool_requirements": ["calculator"]
+        },
+        "self": {
+          "confidence": 0.25,
+          "steps_taken": 0,
+          "prev_action": null
+        },
+        "history": {
+          "total_executions": 5,
+          "success_rate": 0.8
+        }
+      }
+    }
+  ],
+  "outcome": {
+    "success": true,
+    "termination_reason": "SUCCESS",
+    "steps_taken": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "demo_id": "math_simple_001",
+  "metadata": {
+    "task_difficulty": "easy",
+    "teacher_confidence": 0.95,
+    "tags": ["math", "arithmetic", "calculator"]
+  },
+  "trace": [
+    {
+      "step": 0,
+      "demonstrated_action": "RETRIEVE",
+      "state_snapshot": {
+        "task": {
+          "task_type": "math",
+          "complexity_estimate": 0.2,
+          "input_length": 0.15,
+          "entity_count": 0.1,
+          "tool_requirements": ["calculator"]
+        },
+        "self": {
+          "confidence": 0.3,
+          "steps_taken": 0,
+          "prev_action": null
+        },
+        "history": {
+          "total_executions": 0,
+          "success_rate": {}
+        }
+      }
+    }
+  ],
+  "outcome": {
+    "success": true,
+    "termination_reason": "SUCCESS",
+    "steps_taken": 1
+  }
+}

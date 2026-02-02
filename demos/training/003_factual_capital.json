@@ -1,0 +1,37 @@
+{
+  "demo_id": "factual_capital_001",
+  "metadata": {
+    "task_difficulty": "easy",
+    "teacher_confidence": 0.85,
+    "tags": ["factual", "geography", "knowledge"]
+  },
+  "trace": [
+    {
+      "step": 0,
+      "demonstrated_action": "REASON",
+      "state_snapshot": {
+        "task": {
+          "task_type": "factual",
+          "complexity_estimate": 0.35,
+          "input_length": 0.4,
+          "entity_count": 0.6,
+          "tool_requirements": ["search"]
+        },
+        "self": {
+          "confidence": 0.7,
+          "steps_taken": 0,
+          "prev_action": null
+        },
+        "history": {
+          "total_executions": 3,
+          "success_rate": 0.75
+        }
+      }
+    }
+  ],
+  "outcome": {
+    "success": true,
+    "termination_reason": "SUCCESS",
+    "steps_taken": 1
+  }
+}

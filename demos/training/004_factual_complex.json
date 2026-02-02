@@ -1,0 +1,37 @@
+{
+  "demo_id": "factual_complex_001",
+  "metadata": {
+    "task_difficulty": "medium",
+    "teacher_confidence": 0.80,
+    "tags": ["factual", "complex", "search"]
+  },
+  "trace": [
+    {
+      "step": 0,
+      "demonstrated_action": "REASON",
+      "state_snapshot": {
+        "task": {
+          "task_type": "factual",
+          "complexity_estimate": 0.5,
+          "input_length": 0.6,
+          "entity_count": 0.7,
+          "tool_requirements": ["search"]
+        },
+        "self": {
+          "confidence": 0.5,
+          "steps_taken": 0,
+          "prev_action": null
+        },
+        "history": {
+          "total_executions": 8,
+          "success_rate": 0.7
+        }
+      }
+    }
+  ],
+  "outcome": {
+    "success": true,
+    "termination_reason": "SUCCESS",
+    "steps_taken": 1
+  }
+}
