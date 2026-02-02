@@ -24,12 +24,13 @@ dslua is a native Lua implementation of the DSPy framework for building reliable
 - **Optimizer framework** with Compile/Evaluate interface
 - **FewShot module** for demonstration prompts
 - **BootstrapFewShot** for automated prompt tuning
+- **Structured Output** with JSON Schema validation and auto-retry
 - HTTP client integration (lua-http + dkjson)
 - OpenAI provider with real API calls
 - Anthropic provider (Claude API)
 - Gemini provider (Google API)
 - Ollama provider for local testing
-- **172 tests passing** (100% pass rate for ACE)
+- **409 tests passing** (100% pass rate)
 
 🚧 **In Progress:**
 - **ACE (Autonomous Cognitive Entity)** - Phase 1 MVP complete
@@ -42,7 +43,6 @@ dslua is a native Lua implementation of the DSPy framework for building reliable
 📋 **Planned:**
 - Advanced optimizers (MIPRO, etc.)
 - Tool chaining and composition
-- Structured output (JSON adapter)
 - CLI interface
 
 ## Quick Start
@@ -165,6 +165,61 @@ local result = optimized:Process(ctx, {question = "5+5"})
 print(result.answer)  -- "10" (learned from demonstrations)
 ```
 
+### Using Structured Output
+
+StructuredPredict validates LLM outputs against JSON schemas with automatic retry:
+
+```lua
+local dslua = require("dslua")
+
+-- Define schema for expected output
+local schema = dslua.Schema.Object({
+    name = {type = "string"},
+    age = {type = "integer"},
+    email = {
+        type = "string",
+        pattern = "^[^@]+@[^@]+$"
+    }
+})
+
+-- Create signature
+local signature = dslua.Signature.new(
+    {dslua.Field.new("description")},
+    {dslua.Field.new("user_profile")}
+)
+
+-- Create StructuredPredict module
+local structured = dslua.StructuredPredict.new(schema, {
+    signature = signature,
+    max_retries = 3,
+    retry_temperature = 0
+})
+
+structured:WithLLM(llm)
+
+-- Execute with validation and automatic retry
+local envelope = structured:Process(ctx, {
+    description = "Alice, 30 years old, alice@example.com"
+})
+
+if envelope.success then
+    print(envelope.data.name)    -- "Alice"
+    print(envelope.data.age)     -- 30 (validated as integer)
+    print(envelope.data.email)   -- "alice@example.com" (validated against pattern)
+    print(envelope.provenance.source)  -- "strict", "repaired", or "retried"
+else
+    print("Validation failed:", envelope.error.message)
+    print(envelope.error.diagnostics)  -- Detailed error context
+end
+```
+
+StructuredPredict automatically:
+- Validates LLM outputs against JSON Schema Draft 7 (subset)
+- Retries with adjusted prompts when validation fails
+- Repairs minor JSON errors (missing quotes, trailing commas)
+- Tracks provenance (strict/repaired/retried) for debugging
+- Returns detailed error context with diagnostics
+
 ### Using ACE (Autonomous Cognitive Entity)
 
 ACE learns optimal execution paths through experience, coordinating existing modules and tools:
@@ -224,6 +279,7 @@ ACE automatically:
 - [x] Phase 2: HTTP Integration and Advanced Modules
 - [x] Phase 3: ReAct Agent Framework with Tool Registry
 - [x] Phase 4: Optimizers with BootstrapFewShot
+- [x] Phase 5: Structured Output with JSON Schema validation
 
 See [DESIGN.md](DESIGN.md) for detailed implementation phases.
 

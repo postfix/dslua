@@ -11,6 +11,10 @@ M.ChainOfThought = require("dslua.modules.chain_of_thought")
 M.ReAct = require("dslua.modules.react")
 M.Refine = require("dslua.modules.refine")
 M.FewShot = require("dslua.modules.fewshot")
+M.StructuredPredict = require("dslua.modules.structured_predict")
+
+-- Structured output
+M.Schema = require("dslua.structured.schema")
 
 -- Tools
 M.Tool = require("dslua.tools.base")
