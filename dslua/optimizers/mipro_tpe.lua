@@ -80,7 +80,8 @@ function M._sampleParam(param_def, opts)
   local seed = opts.seed or math.random()
 
   if seed then
-    math.randomseed(seed)
+    -- Ensure seed is an integer for randomseed
+    math.randomseed(math.floor(seed))
   end
 
   if param_def.type == "int" then

@@ -233,6 +233,92 @@ function ACE:TrainFromDemoDirectory(directory, opts)
     return self:TrainFromDemos(demos, opts)
 end
 
+-- =============================================================================
+-- Phase 3 Integration: Threshold Learning
+-- =============================================================================
+
+function ACE:OptimizeThresholds(decision_history, opts)
+    opts = opts or {}
+    local Threshold = require("dslua.agents.ace_threshold")
+
+    local optimized = Threshold.OptimizeAllThresholds(self._rules, decision_history, opts)
+
+    -- Update rule thresholds
+    for rule_key, result in pairs(optimized) do
+        for _, rule in ipairs(self._rules) do
+            if rule.key == rule_key then
+                rule.threshold = result.threshold
+                break
+            end
+        end
+    end
+
+    return optimized
+end
+
+function ACE:AdaptThresholdOnline(rule_key, recent_outcomes, opts)
+    opts = opts or {}
+    local Threshold = require("dslua.agents.ace_threshold")
+
+    -- Find current threshold for rule
+    local current_threshold = 0.5
+    for _, rule in ipairs(self._rules) do
+        if rule.key == rule_key then
+            current_threshold = rule.threshold or 0.5
+            break
+        end
+    end
+
+    -- Adapt threshold
+    local new_threshold, metric = Threshold.AdaptThreshold(
+        current_threshold,
+        recent_outcomes,
+        opts
+    )
+
+    -- Update rule threshold
+    for _, rule in ipairs(self._rules) do
+        if rule.key == rule_key then
+            rule.threshold = new_threshold
+            break
+        end
+    end
+
+    return new_threshold, metric
+end
+
+function ACE:AnalyzeThresholdPerformance(decision_history, opts)
+    opts = opts or {}
+    local Threshold = require("dslua.agents.ace_threshold")
+
+    -- Collect current thresholds
+    local thresholds = {}
+    for _, rule in ipairs(self._rules) do
+        thresholds[rule.key] = rule.threshold or 0.5
+    end
+
+    -- Compute stats
+    local stats = Threshold.ComputeThresholdStats(thresholds, decision_history, opts)
+
+    return stats
+end
+
+function ACE:RecommendThresholdForRule(rule_key, rule_info)
+    local Threshold = require("dslua.agents.ace_threshold")
+
+    local recommended = Threshold.RecommendThreshold(rule_info)
+
+    -- Update rule if recommended
+    for _, rule in ipairs(self._rules) do
+        if rule.key == rule_key then
+            rule.threshold = recommended
+            break
+        end
+    end
+
+    return recommended
+end
+
 function ACE:_SelectAction(state, rules)
     if #rules == 0 then
         return "REASON"  -- Fallback action
@@ -415,6 +501,155 @@ function ACE:_FormatResult(state, termination_reason)
     }
 
     return result
+end
+
+-- =============================================================================
+-- Phase 3 Integration: Temporal Credit Assignment
+-- =============================================================================
+
+function ACE:LearnFromExecution(trace, opts)
+    opts = opts or {}
+    local TemporalCredit = require("dslua.agents.ace_temporal_credit")
+
+    -- Classify outcome
+    local outcome = TemporalCredit.ClassifyOutcome(trace, opts)
+
+    -- Analyze trace
+    local analysis = TemporalCredit.AnalyzeTrace(trace, opts)
+
+    -- Assign credit using temporal difference learning
+    local credit_method = opts.credit_method or "td"
+    local credits
+
+    if credit_method == "td" then
+        credits = TemporalCredit.AssignCredit(trace, outcome, analysis, opts)
+    elseif credit_method == "salience" then
+        credits = TemporalCredit.DistributeCreditBySalience(trace, outcome, analysis, opts)
+    elseif credit_method == "recency" then
+        credits = TemporalCredit.AssignCreditByRecency(trace, outcome, analysis, opts)
+    else
+        error("Unknown credit method: " .. tostring(credit_method))
+    end
+
+    -- Update weights based on credit assignments
+    self:_ApplyCreditAssignments(credits, opts)
+
+    -- Return outcome and analysis for tracking
+    return {
+        outcome = outcome,
+        analysis = analysis,
+        credits = credits
+    }
+end
+
+function ACE:_ApplyCreditAssignments(credits, opts)
+    opts = opts or {}
+    local learning_rate = opts.learning_rate or 0.1
+
+    -- Initialize weights table if needed
+    if not self._weights then
+        self._weights = {}
+    end
+
+    -- Apply credit to rule weights
+    for rule_id, credit_info in pairs(credits) do
+        -- Find the rule key (rule_id might be formatted)
+        local rule_key = rule_id
+
+        -- Check if this is a direct rule key
+        if not self._weights[rule_key] then
+            -- Try to find matching rule
+            for key, _ in pairs(self._weights) do
+                if string.find(key, rule_id) or string.find(rule_id, key) then
+                    rule_key = key
+                    break
+                end
+            end
+        end
+
+        -- Update weight if found
+        if self._weights[rule_key] then
+            local credit_delta = credit_info.total_credit * learning_rate
+            self._weights[rule_key] = self._weights[rule_key] + credit_delta
+
+            -- Clamp weight to reasonable bounds
+            self._weights[rule_key] = math.max(0.0, math.min(1.0, self._weights[rule_key]))
+        end
+    end
+end
+
+function ACE:AggregateExecutionCredits(credits_list, opts)
+    opts = opts or {}
+    local TemporalCredit = require("dslua.agents.ace_temporal_credit")
+
+    -- Aggregate credits from multiple executions
+    local aggregated = TemporalCredit.AggregateCredits(credits_list, opts)
+
+    -- Normalize if requested
+    if opts.normalize then
+        aggregated = TemporalCredit.NormalizeCredits(aggregated, opts)
+    end
+
+    return aggregated
+end
+
+function ACE:ProcessExecutionWithOutcome(state, termination_reason, opts)
+    opts = opts or {}
+
+    -- Build trace from state
+    local trace = self._BuildExecutionTrace(state, termination_reason)
+
+    -- Learn from execution
+    local result = self:LearnFromExecution(trace, opts)
+
+    return result
+end
+
+function ACE:_BuildExecutionTrace(state, termination_reason)
+    local trace = {
+        steps = {},
+        final_result = nil,
+        error = nil
+    }
+
+    -- Extract steps from state history
+    if state.self and state.self.action_history then
+        for i, action_record in ipairs(state.self.action_history) do
+            local step = {
+                decision = nil,
+                tool = nil,
+                duration_ms = nil
+            }
+
+            -- Extract decision info if available
+            if action_record.decision then
+                step.decision = {
+                    rule_id = action_record.decision.rule_id,
+                    salience = action_record.decision.salience,
+                    outcome = action_record.decision.outcome
+                }
+            end
+
+            -- Extract tool info if applicable
+            if action_record.tool then
+                step.tool = {
+                    name = action_record.tool.name
+                }
+            end
+
+            table.insert(trace.steps, step)
+        end
+    end
+
+    -- Set outcome
+    if termination_reason == "success" then
+        trace.final_result = {answer = state.answer}
+        trace.error = nil
+    else
+        trace.error = termination_reason
+    end
+
+    return trace
 end
 
 return ACE

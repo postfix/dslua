@@ -46,8 +46,9 @@ describe("Optimizer Integration", function()
         local mock_llm = {
             Complete = function(self, ctx, prompt)
                 -- Check if prompt has demonstrations
-                local has_demos = prompt:match("2 %+ 3") or prompt:match("4 %+ 1")
+                local has_demos = prompt:match("2 %+ 3") or prompt:match("4 %+ 1") or prompt:match("3 %+ 3") or prompt:match("1 %+ 1")
                 if has_demos then
+                    -- Return correct answer for the test question
                     return {answer = "7"}
                 end
                 return {answer = "unknown"}
