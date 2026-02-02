@@ -281,4 +281,110 @@ describe("Strategy Selector", function()
     end)
   end)
 
+  describe("Token estimation", function()
+    it("should estimate tokens for simple schema", function()
+      local schema = Schema.Object({
+        name = {type = "string"},
+        age = {type = "integer"}
+      })
+
+      local tokens = StrategySelector.estimate_tokens(schema)
+
+      assert.is_true(tokens > 0)
+      assert.is_true(tokens < 1000)
+    end)
+
+    it("should estimate tokens for schema with enum", function()
+      local schema = Schema.Object({
+        status = {
+          type = "string",
+          enum = {"active", "inactive", "pending"}
+        }
+      })
+
+      local tokens = StrategySelector.estimate_tokens(schema)
+
+      assert.is_true(tokens > 0)
+      -- Should be higher due to enum values
+      assert.is_true(tokens > 10)
+    end)
+
+    it("should estimate tokens for schema with pattern", function()
+      local schema = Schema.Object({
+        email = {
+          type = "string",
+          pattern = "^[^@]+@[^@]+$"
+        }
+      })
+
+      local tokens = StrategySelector.estimate_tokens(schema)
+
+      assert.is_true(tokens > 0)
+      -- Should include pattern length
+      assert.is_true(tokens > #'^[^@]+@[^@]+$')
+    end)
+
+    it("should estimate tokens for nested schema", function()
+      local schema = Schema.Object({
+        user = {
+          type = "object",
+          properties = {
+            name = {type = "string"},
+            profile = {
+              type = "object",
+              properties = {
+                bio = {type = "string"}
+              }
+            }
+          }
+        }
+      })
+
+      local tokens = StrategySelector.estimate_tokens(schema)
+
+      assert.is_true(tokens > 0)
+      -- Should account for nested structure
+      assert.is_true(tokens > 20)
+    end)
+
+    it("should estimate tokens for array schema", function()
+      local schema = Schema.Object({
+        tags = {
+          type = "array",
+          items = {type = "string"}
+        }
+      })
+
+      local tokens = StrategySelector.estimate_tokens(schema)
+
+      assert.is_true(tokens > 0)
+      assert.is_true(tokens < 1000)
+    end)
+
+    it("should estimate tokens for complex schema", function()
+      local schema = Schema.Object({
+        name = {type = "string"},
+        age = {type = "integer"},
+        email = {
+          type = "string",
+          pattern = "^[^@]+@[^@]+$"
+        },
+        status = {
+          type = "string",
+          enum = {"active", "inactive"}
+        },
+        tags = {
+          type = "array",
+          items = {type = "string"}
+        }
+      })
+
+      local tokens = StrategySelector.estimate_tokens(schema)
+
+      assert.is_true(tokens > 0)
+      -- Complex schema should have higher estimate
+      assert.is_true(tokens > 50)
+    end)
+  end)
+
 end)
