@@ -2,7 +2,7 @@
 
 **DSPy for LuaJIT 2.1+** - Systematic prompt engineering with compiled performance.
 
-[![Tests](https://img.shields.io/badge/tests-974%20passing-brightgreen)](https://github.com/postfix/dslua)
+[![Tests](https://img.shields.io/badge/tests-999%20passing-brightgreen)](https://github.com/postfix/dslua)
 [![Parity](https://img.shields.io/badge/parity-DSPy--Go~99%25-blue)](https://github.com/postfix/dslua)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -84,6 +84,11 @@ dslua brings the **systematic prompt engineering** paradigm of [DSPy](https://gi
   - Latency statistics, throughput, cost estimation
   - Error analysis, metric aggregation
   - 51 tests passing
+- **`Session Logger`** - Execution trace analysis ✨ NEW
+  - Session logging and persistence
+  - Event tracking with timestamps
+  - Timeline and issue views
+  - 25 tests passing
 
 **CLI Interface:**
 - **`try` Command** - Instant optimizer testing ✨ NEW
@@ -280,7 +285,7 @@ busted specs/agents/
 busted --verbose
 ```
 
-**Test Coverage:** 974 tests passing (0 failures, 0 errors, 5 API-key dependent)
+**Test Coverage:** 999 tests passing (0 failures, 0 errors, 5 API-key dependent)
 
 ---
 
@@ -441,10 +446,10 @@ See [Feature Parity Review](docs/plans/2026-02-02-feature-parity-review.md) for 
 - [x] **CLI try command** for instant optimizer testing ✅
 - [x] **MCP Integration** for Model Context Protocol ✅
 - [x] **XML Adapter** for structured XML output ✅
+- [x] **Session Logger** for execution trace analysis ✅
 
 ### 🔄 In Progress
 
-- [ ] Session log viewer
 - [ ] Interactive REPL
 - [ ] Advanced teleprompting
 
