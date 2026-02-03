@@ -364,4 +364,265 @@ describe("Instructional Strategy", function()
     end)
   end)
 
+  describe("Private Functions", function()
+    describe("_generate_field_instruction", function()
+      it("should generate instruction for required field", function()
+        local field_schema = {type = "string"}
+        local parent_schema = {properties = {}, required = {"name"}}
+        local instruction = Instructional._generate_field_instruction("name", field_schema, parent_schema)
+
+        assert.is_truthy(instruction:find("*name:"))
+      end)
+
+      it("should generate instruction for optional field", function()
+        local field_schema = {type = "string"}
+        local parent_schema = {properties = {}, required = {}}
+        local instruction = Instructional._generate_field_instruction("name", field_schema, parent_schema)
+
+        assert.is.truthy(instruction:find("name:"))
+        assert.is.falsy(instruction:find("*name:"))
+      end)
+    end)
+
+    describe("_get_constraint_info", function()
+      it("should return const value", function()
+        local info = Instructional._get_constraint_info({const = "fixed"}, "string")
+        assert.is.equal('"fixed"', info)
+      end)
+
+      it("should handle string type", function()
+        local info = Instructional._get_constraint_info({type = "string"}, "string")
+        assert.is.truthy(info:find("<string>"))
+      end)
+
+      it("should handle boolean type", function()
+        local info = Instructional._get_constraint_info({type = "boolean"}, "boolean")
+        assert.is.equal("true | false", info)
+      end)
+
+      it("should handle null type", function()
+        local info = Instructional._get_constraint_info({type = "null"}, "null")
+        assert.is.equal("null", info)
+      end)
+
+      it("should return ? for unknown type", function()
+        local info = Instructional._get_constraint_info({type = "unknown"}, "unknown")
+        assert.is.equal("?", info)
+      end)
+    end)
+
+    describe("_get_string_constraint_info", function()
+      it("should include placeholder", function()
+        local info = Instructional._get_string_constraint_info({type = "string"})
+        assert.is.truthy(info:find('"<string>"'))
+      end)
+
+      it("should include enum values", function()
+        local info = Instructional._get_string_constraint_info({
+          type = "string",
+          enum = {"a", "b", "c"}
+        })
+        assert.is.truthy(info:find("enum"))
+      end)
+
+      it("should include minLength", function()
+        local info = Instructional._get_string_constraint_info({
+          type = "string",
+          minLength = 5
+        })
+        assert.is.truthy(info:find("min_len=5"))
+      end)
+
+      it("should include maxLength", function()
+        local info = Instructional._get_string_constraint_info({
+          type = "string",
+          maxLength = 100
+        })
+        assert.is.truthy(info:find("max_len=100"))
+      end)
+
+      it("should include pattern", function()
+        local info = Instructional._get_string_constraint_info({
+          type = "string",
+          pattern = "^[a-z]+$"
+        })
+        assert.is.truthy(info:find("pattern"))
+      end)
+    end)
+
+    describe("_get_numeric_constraint_info", function()
+      it("should use integer placeholder for integer type", function()
+        local info = Instructional._get_numeric_constraint_info({type = "integer"}, "integer")
+        assert.is.truthy(info:find("42"))
+      end)
+
+      it("should use number placeholder for number type", function()
+        local info = Instructional._get_numeric_constraint_info({type = "number"}, "number")
+        assert.is.truthy(info:find("123.45"))
+      end)
+
+      it("should include minimum constraint", function()
+        local info = Instructional._get_numeric_constraint_info({
+          type = "number",
+          minimum = 0
+        }, "number")
+        assert.is.truthy(info:find(">="))
+      end)
+
+      it("should include exclusiveMinimum", function()
+        local info = Instructional._get_numeric_constraint_info({
+          type = "number",
+          minimum = 0,
+          exclusiveMinimum = 0
+        }, "number")
+        assert.is.truthy(info:find(">"))
+      end)
+
+      it("should include maximum constraint", function()
+        local info = Instructional._get_numeric_constraint_info({
+          type = "number",
+          maximum = 100
+        }, "number")
+        assert.is.truthy(info:find("<="))
+      end)
+
+      it("should include exclusiveMaximum", function()
+        local info = Instructional._get_numeric_constraint_info({
+          type = "number",
+          maximum = 100,
+          exclusiveMaximum = 100
+        }, "number")
+        assert.is.truthy(info:find("<"))
+      end)
+    end)
+
+    describe("_get_array_constraint_info", function()
+      it("should include minItems", function()
+        local info = Instructional._get_array_constraint_info({
+          type = "array",
+          items = {type = "string"},
+          minItems = 2
+        })
+        assert.is.truthy(info:find("minItems=2"))
+      end)
+
+      it("should include maxItems", function()
+        local info = Instructional._get_array_constraint_info({
+          type = "array",
+          items = {type = "string"},
+          maxItems = 5
+        })
+        assert.is.truthy(info:find("maxItems=5"))
+      end)
+
+      it("should show string array format", function()
+        local info = Instructional._get_array_constraint_info({
+          type = "array",
+          items = {type = "string"}
+        })
+        assert.is.truthy(info:find('["<string>", ...]'))
+      end)
+
+      it("should show number array format", function()
+        local info = Instructional._get_array_constraint_info({
+          type = "array",
+          items = {type = "number"}
+        })
+        assert.is.truthy(info:find("[123, ...]"))
+      end)
+
+      it("should show boolean array format", function()
+        local info = Instructional._get_array_constraint_info({
+          type = "array",
+          items = {type = "boolean"}
+        })
+        assert.is.truthy(info:find("[true, ...]"))
+      end)
+
+      it("should show object array format", function()
+        local info = Instructional._get_array_constraint_info({
+          type = "array",
+          items = {type = "object"}
+        })
+        assert.is.truthy(info:find("[{...}, ...]"))
+      end)
+    end)
+
+    describe("_get_object_constraint_info", function()
+      it("should return placeholder for object without properties", function()
+        local info = Instructional._get_object_constraint_info({type = "object"})
+        assert.is.equal('{"<key>": "<value>"}', info)
+      end)
+
+      it("should show properties for nested object", function()
+        local info = Instructional._get_object_constraint_info({
+          type = "object",
+          properties = {
+            name = {type = "string"},
+            age = {type = "integer"}
+          }
+        })
+        assert.is.truthy(info:find('"name"'))
+        assert.is.truthy(info:find('"age"'))
+      end)
+    end)
+
+    describe("_get_placeholder_for_type", function()
+      it("should return string placeholder", function()
+        assert.is.equal('"<string>"', Instructional._get_placeholder_for_type("string"))
+      end)
+
+      it("should return number placeholder", function()
+        assert.is.equal("123", Instructional._get_placeholder_for_type("number"))
+      end)
+
+      it("should return integer placeholder", function()
+        assert.is.equal("42", Instructional._get_placeholder_for_type("integer"))
+      end)
+
+      it("should return boolean placeholder", function()
+        assert.is.equal("true", Instructional._get_placeholder_for_type("boolean"))
+      end)
+
+      it("should return null placeholder", function()
+        assert.is.equal("null", Instructional._get_placeholder_for_type("null"))
+      end)
+
+      it("should return array placeholder", function()
+        assert.is.equal("[...]", Instructional._get_placeholder_for_type("array"))
+      end)
+
+      it("should return object placeholder", function()
+        assert.is.equal("{...}", Instructional._get_placeholder_for_type("object"))
+      end)
+
+      it("should return default for unknown type", function()
+        assert.is.equal('"?"', Instructional._get_placeholder_for_type("unknown"))
+      end)
+    end)
+
+    describe("_generic_instructions", function()
+      it("should return format instructions", function()
+        local instructions = Instructional._generic_instructions()
+
+        assert.is.truthy(instructions:find("[OUTPUT FORMAT]"))
+        assert.is.truthy(instructions:find("[END FORMAT]"))
+      end)
+    end)
+
+    describe("_table_contains", function()
+      it("should return true when value in table", function()
+        assert.is_true(Instructional._table_contains({"a", "b", "c"}, "b"))
+      end)
+
+      it("should return false when value not in table", function()
+        assert.is_false(Instructional._table_contains({"a", "b", "c"}, "d"))
+      end)
+
+      it("should return false for empty table", function()
+        assert.is_false(Instructional._table_contains({}, "a"))
+      end)
+    end)
+  end)
+
 end)

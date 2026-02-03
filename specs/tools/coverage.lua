@@ -167,4 +167,12 @@ function M.generate_report(coverage_data)
   return table.concat(lines, "\n")
 end
 
+-- Run if executed directly
+if arg and arg[0] and arg[0]:match("coverage%.lua") then
+  local coverage = M.analyze_coverage()
+  if coverage then
+    print(M.generate_report(coverage))
+  end
+end
+
 return M

@@ -493,4 +493,63 @@ describe("MIPRO Optimizer", function()
 
   end)
 
+  describe("Private Functions", function()
+    describe("_defaultHyperparameterSpace", function()
+      it("should return default hyperparameter space", function()
+        local space = MIPRO._defaultHyperparameterSpace()
+
+        assert.is_not_nil(space.num_demos)
+        assert.is_equal("int", space.num_demos.type)
+        assert.is_equal(1, space.num_demos.min)
+        assert.is_equal(16, space.num_demos.max)
+
+        assert.is_not_nil(space.demo_selection)
+        assert.is_equal("enum", space.demo_selection.type)
+        assert.is_truthy(#space.demo_selection.values > 0)
+
+        assert.is_not_nil(space.instruction_template)
+        assert.is_equal("enum", space.instruction_template.type)
+      end)
+    end)
+
+    describe("_buildContext", function()
+      it("should build context with LLM function", function()
+        local ctx = MIPRO._buildContext()
+
+        assert.is_not_nil(ctx)
+        assert.is_not_nil(ctx.LLM)
+        assert.is_equal("function", type(ctx.LLM))
+      end)
+    end)
+
+    describe("_shouldStopEarly", function()
+      it("should not stop before minimum trials", function()
+        local optimizer = MIPRO.new(nil)
+        optimizer.early_stopping_rounds = 3
+
+        local should_stop = MIPRO._shouldStopEarly(optimizer, 5, 3)
+
+        assert.is_false(should_stop)
+      end)
+
+      it("should not stop if under early stopping threshold", function()
+        local optimizer = MIPRO.new(nil)
+        optimizer.early_stopping_rounds = 5
+
+        local should_stop = MIPRO._shouldStopEarly(optimizer, 3, 10)
+
+        assert.is_false(should_stop)
+      end)
+
+      it("should stop if no improvement for threshold rounds", function()
+        local optimizer = MIPRO.new(nil)
+        optimizer.early_stopping_rounds = 3
+
+        local should_stop = MIPRO._shouldStopEarly(optimizer, 3, 10)
+
+        assert.is_true(should_stop)
+      end)
+    end)
+  end)
+
 end)

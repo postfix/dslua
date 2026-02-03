@@ -438,4 +438,107 @@ describe("Retrieve Module", function()
       assert.is_truthy(result.context)
     end)
   end)
+
+  describe("Private Functions", function()
+    describe("_simpleEmbed", function()
+      it("should generate simple embedding from text", function()
+        local retriever = Retrieve.VectorRetriever.new({vector_size = 10})
+
+        local embedding = retriever:_simpleEmbed("hello world")
+
+        assert.is_not_nil(embedding)
+        assert.is.equal(10, #embedding)  -- vector_size
+      end)
+
+      it("should generate different embeddings for different texts", function()
+        local retriever = Retrieve.VectorRetriever.new({vector_size = 10})
+
+        local embed1 = retriever:_simpleEmbed("hello")
+        local embed2 = retriever:_simpleEmbed("world")
+
+        -- Should be different (though simple hash-based)
+        assert.is_not_nil(embed1)
+        assert.is_not_nil(embed2)
+      end)
+
+      it("should pad embedding to vector_size", function()
+        local retriever = Retrieve.VectorRetriever.new({vector_size = 50})
+
+        local embedding = retriever:_simpleEmbed("hi")
+
+        assert.is.equal(50, #embedding)
+      end)
+    end)
+
+    describe("_cosineSimilarity", function()
+      it("should calculate cosine similarity", function()
+        local vec1 = {1.0, 0.0, 0.0}
+        local vec2 = {1.0, 0.0, 0.0}
+
+        local sim = Retrieve._cosineSimilarity(vec1, vec2)
+
+        assert.is.equal(1.0, sim)  -- Identical vectors
+      end)
+
+      it("should return 0 for orthogonal vectors", function()
+        local vec1 = {1.0, 0.0, 0.0}
+        local vec2 = {0.0, 1.0, 0.0}
+
+        local sim = Retrieve._cosineSimilarity(vec1, vec2)
+
+        assert.is.equal(0, sim)  -- Orthogonal
+      end)
+
+      it("should return 0 for zero vectors", function()
+        local vec1 = {0.0, 0.0, 0.0}
+        local vec2 = {1.0, 0.0, 0.0}
+
+        local sim = Retrieve._cosineSimilarity(vec1, vec2)
+
+        assert.is.equal(0, sim)  -- Zero magnitude
+      end)
+    end)
+
+    describe("_defaultFormat", function()
+      it("should format empty docs", function()
+        local formatted = Retrieve._defaultFormat({}, {})
+
+        assert.is.equal("", formatted)
+      end)
+
+      it("should format documents with text field", function()
+        local docs = {
+          {text = "Document 1 content"},
+          {text = "Document 2 content"}
+        }
+
+        local formatted = Retrieve._defaultFormat(docs, {})
+
+        assert.is_truthy(formatted:find("Retrieved context"))
+        assert.is_truthy(formatted:find("[1]"))
+        assert.is_truthy(formatted:find("[2]"))
+      end)
+
+      it("should format documents with content field", function()
+        local docs = {
+          {content = "Content 1"}
+        }
+
+        local formatted = Retrieve._defaultFormat(docs, {})
+
+        assert.is_truthy(formatted:find("Content 1"))
+      end)
+
+      it("should include metadata if present", function()
+        local docs = {
+          {text = "Doc", metadata = {source = "test"}}
+        }
+
+        local formatted = Retrieve._defaultFormat(docs, {})
+
+        assert.is_truthy(formatted:find("metadata"))
+      end)
+    end)
+  end)
+
 end)

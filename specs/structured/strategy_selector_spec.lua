@@ -387,4 +387,123 @@ describe("Strategy Selector", function()
     end)
   end)
 
+  describe("Private Functions", function()
+    describe("_analyze_property", function()
+      it("should detect nested objects", function()
+        local analysis = {
+          is_flat = true,
+          has_nested_objects = false,
+          has_arrays = false,
+          has_enum = false,
+          has_pattern = false,
+          has_const = false,
+          field_count = 0,
+          max_depth = 0
+        }
+
+        local prop_schema = {
+          type = "object",
+          properties = {
+            nested = {type = "string"}
+          }
+        }
+
+        local depth = StrategySelector._analyze_property(prop_schema, analysis, 1)
+
+        assert.is_true(analysis.has_nested_objects)
+        assert.is_equal(2, depth)
+      end)
+
+      it("should detect arrays", function()
+        local analysis = {
+          is_flat = true,
+          has_nested_objects = false,
+          has_arrays = false,
+          has_enum = false,
+          has_pattern = false,
+          has_const = false,
+          field_count = 0,
+          max_depth = 0
+        }
+
+        local prop_schema = {
+          type = "array",
+          items = {type = "string"}
+        }
+
+        local depth = StrategySelector._analyze_property(prop_schema, analysis, 1)
+
+        assert.is_true(analysis.has_arrays)
+        assert.is_equal(2, depth)
+      end)
+
+      it("should detect enum constraints", function()
+        local analysis = {
+          is_flat = true,
+          has_nested_objects = false,
+          has_arrays = false,
+          has_enum = false,
+          has_pattern = false,
+          has_const = false,
+          field_count = 0,
+          max_depth = 0
+        }
+
+        local prop_schema = {
+          type = "string",
+          enum = {"a", "b", "c"}
+        }
+
+        local depth = StrategySelector._analyze_property(prop_schema, analysis, 1)
+
+        assert.is_true(analysis.has_enum)
+        assert.is_equal(1, depth)
+      end)
+
+      it("should detect pattern constraints", function()
+        local analysis = {
+          is_flat = true,
+          has_nested_objects = false,
+          has_arrays = false,
+          has_enum = false,
+          has_pattern = false,
+          has_const = false,
+          field_count = 0,
+          max_depth = 0
+        }
+
+        local prop_schema = {
+          type = "string",
+          pattern = "^[a-z]+$"
+        }
+
+        local depth = StrategySelector._analyze_property(prop_schema, analysis, 1)
+
+        assert.is_true(analysis.has_pattern)
+      end)
+
+      it("should detect const constraints", function()
+        local analysis = {
+          is_flat = true,
+          has_nested_objects = false,
+          has_arrays = false,
+          has_enum = false,
+          has_pattern = false,
+          has_const = false,
+          field_count = 0,
+          max_depth = 0
+        }
+
+        local prop_schema = {
+          type = "string",
+          const = "fixed"
+        }
+
+        local depth = StrategySelector._analyze_property(prop_schema, analysis, 1)
+
+        assert.is_true(analysis.has_const)
+      end)
+    end)
+  end)
+
 end)

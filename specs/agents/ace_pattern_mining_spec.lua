@@ -224,4 +224,50 @@ describe("ACE Pattern Mining", function()
 
   end)
 
+  describe("Private Functions", function()
+    describe("_createFeatureSignature", function()
+      it("should create signature with task type", function()
+        local features = {task_type = "math"}
+
+        local signature = PatternMining._createFeatureSignature(features)
+
+        assert.is.equal("type=math", signature)
+      end)
+
+      it("should bin complexity into ranges", function()
+        local low_features = {complexity_estimate = 0.3}
+        local med_features = {complexity_estimate = 0.5}
+        local high_features = {complexity_estimate = 0.8}
+
+        local low_sig = PatternMining._createFeatureSignature(low_features)
+        local med_sig = PatternMining._createFeatureSignature(med_features)
+        local high_sig = PatternMining._createFeatureSignature(high_features)
+
+        assert.is.truthy(low_sig:find("complexity=low"))
+        assert.is.truthy(med_sig:find("complexity=medium"))
+        assert.is.truthy(high_sig:find("complexity=high"))
+      end)
+
+      it("should include tool requirements", function()
+        local features = {
+          task_type = "factual",
+          tool_requirements = {"search", "calculator"}
+        }
+
+        local signature = PatternMining._createFeatureSignature(features)
+
+        assert.is.truthy(signature:find("type=factual"))
+        assert.is.truthy(signature:find("tools=search,calculator"))
+      end)
+
+      it("should handle empty features", function()
+        local features = {}
+
+        local signature = PatternMining._createFeatureSignature(features)
+
+        assert.is.equal("", signature)
+      end)
+    end)
+  end)
+
 end)

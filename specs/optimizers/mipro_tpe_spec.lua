@@ -251,4 +251,117 @@ describe("MIPRO TPE Module", function()
 
   end)
 
+  describe("Private Functions", function()
+    describe("_sampleFromSpace", function()
+      it("should sample all parameters from space", function()
+        local space = {
+          num_demos = {type = "int", min = 1, max = 10},
+          strategy = {type = "enum", values = {"random", "diverse"}}
+        }
+
+        local candidate = TPE._sampleFromSpace(space, {seed = 42})
+
+        assert.is_not_nil(candidate.num_demos)
+        assert.is_not_nil(candidate.strategy)
+        assert.is_true(candidate.num_demos >= 1 and candidate.num_demos <= 10)
+      end)
+    end)
+
+    describe("_computeEI", function()
+      it("should compute expected improvement", function()
+        local candidate = {num_demos = 4}
+        local good_obs = {
+          {params = {num_demos = 3}, score = 0.8},
+          {params = {num_demos = 4}, score = 0.75}
+        }
+        local poor_obs = {
+          {params = {num_demos = 1}, score = 0.4},
+          {params = {num_demos = 2}, score = 0.5}
+        }
+        local space = {
+          num_demos = {type = "int", min = 1, max = 10}
+        }
+
+        local ei = TPE._computeEI(candidate, good_obs, poor_obs, space)
+
+        assert.is_truthy(ei >= 0)
+      end)
+    end)
+
+    describe("_computeSimilarity", function()
+      it("should compute similarity for integer params", function()
+        local params1 = {num_demos = 3}
+        local params2 = {num_demos = 4}
+        local space = {
+          num_demos = {type = "int", min = 1, max = 10}
+        }
+
+        local sim = TPE._computeSimilarity(params1, params2, space)
+
+        assert.is_truthy(sim >= 0 and sim <= 1)
+      end)
+
+      it("should compute similarity for enum params", function()
+        local params1 = {strategy = "random"}
+        local params2 = {strategy = "random"}
+        local space = {
+          strategy = {type = "enum", values = {"random", "diverse"}}
+        }
+
+        local sim = TPE._computeSimilarity(params1, params2, space)
+
+        assert.is.equal(1.0, sim)
+      end)
+
+      it("should return 0 for no matching params", function()
+        local params1 = {num_demos = 3}
+        local params2 = {other = 4}
+        local space = {
+          num_demos = {type = "int", min = 1, max = 10}
+        }
+
+        local sim = TPE._computeSimilarity(params1, params2, space)
+
+        assert.is.equal(0, sim)
+      end)
+    end)
+
+    describe("_computeDensity", function()
+      it("should compute density for integer param", function()
+        local value = 3
+        local observations = {
+          {params = {num_demos = 3}, score = 0.8},
+          {params = {num_demos = 4}, score = 0.75}
+        }
+        local param_def = {
+          type = "int",
+          min = 1,
+          max = 10,
+          name = "num_demos"
+        }
+
+        local density = TPE._computeDensity(value, observations, param_def)
+
+        assert.is_truthy(density >= 0)
+      end)
+
+      it("should compute density for enum param", function()
+        local value = "random"
+        local observations = {
+          {params = {strategy = "random"}, score = 0.8},
+          {params = {strategy = "diverse"}, score = 0.5}
+        }
+        local param_def = {
+          type = "enum",
+          values = {"random", "diverse"},
+          name = "strategy"
+        }
+
+        local density = TPE._computeDensity(value, observations, param_def)
+
+        assert.is_truthy(density > 0)  -- One match
+      end)
+    end)
+  end)
+
 end)

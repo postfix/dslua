@@ -286,3 +286,158 @@ describe("ACE Decision - PredictAction", function()
     assert.is_equal("REASON", predicted)
   end)
 end)
+
+describe("ACE Decision - Private Functions", function()
+  local M
+
+  setup(function()
+    M = require("dslua.agents.ace_decision")
+  end)
+
+  describe("_RuleMatches", function()
+    it("returns true when all conditions match", function()
+      local rule = {
+        conditions = {
+          {feature = "task_type", op = "==", value = "math"},
+          {feature = "complexity_estimate", op = ">=", threshold = 0.5}
+        }
+      }
+      local state = {
+        task = {task_type = "math", complexity_estimate = 0.7},
+        self = {}
+      }
+
+      local matches = M._RuleMatches(rule, state)
+
+      assert.is_true(matches)
+    end)
+
+    it("returns false when any condition fails", function()
+      local rule = {
+        conditions = {
+          {feature = "task_type", op = "==", value = "math"},
+          {feature = "complexity_estimate", op = ">=", threshold = 0.8}
+        }
+      }
+      local state = {
+        task = {task_type = "math", complexity_estimate = 0.7},
+        self = {}
+      }
+
+      local matches = M._RuleMatches(rule, state)
+
+      assert.is_false(matches)
+    end)
+
+    it("returns true for empty conditions", function()
+      local rule = {conditions = {}}
+      local state = {task = {}, self = {}}
+
+      local matches = M._RuleMatches(rule, state)
+
+      assert.is_true(matches)
+    end)
+  end)
+
+  describe("_ConditionMatches", function()
+    it("matches equality condition", function()
+      local condition = {feature = "task_type", op = "==", value = "math"}
+      local state = {task = {task_type = "math"}, self = {}}
+
+      local matches = M._ConditionMatches(condition, state)
+
+      assert.is_true(matches)
+    end)
+
+    it("matches greater than condition", function()
+      local condition = {feature = "complexity_estimate", op = ">", threshold = 0.5}
+      local state = {task = {complexity_estimate = 0.7}, self = {}}
+
+      local matches = M._ConditionMatches(condition, state)
+
+      assert.is_true(matches)
+    end)
+
+    it("matches less than condition", function()
+      local condition = {feature = "complexity_estimate", op = "<", threshold = 0.5}
+      local state = {task = {complexity_estimate = 0.3}, self = {}}
+
+      local matches = M._ConditionMatches(condition, state)
+
+      assert.is_true(matches)
+    end)
+
+    it("matches greater than or equal condition", function()
+      local condition = {feature = "complexity_estimate", op = ">=", threshold = 0.5}
+      local state = {task = {complexity_estimate = 0.5}, self = {}}
+
+      local matches = M._ConditionMatches(condition, state)
+
+      assert.is_true(matches)
+    end)
+
+    it("matches less than or equal condition", function()
+      local condition = {feature = "complexity_estimate", op = "<=", threshold = 0.5}
+      local state = {task = {complexity_estimate = 0.5}, self = {}}
+
+      local matches = M._ConditionMatches(condition, state)
+
+      assert.is_true(matches)
+    end)
+
+    it("returns false for missing feature", function()
+      local condition = {feature = "missing_feature", op = "==", value = "test"}
+      local state = {task = {}, self = {}}
+
+      local matches = M._ConditionMatches(condition, state)
+
+      assert.is_false(matches)
+    end)
+  end)
+
+  describe("_GetFeatureValue", function()
+    it("retrieves value from task layer", function()
+      local state = {task = {task_type = "math"}, self = {}}
+
+      local value = M._GetFeatureValue(state, "task_type")
+
+      assert.is_equal("math", value)
+    end)
+
+    it("retrieves value from self layer", function()
+      local state = {task = {}, self = {confidence = 0.8}}
+
+      local value = M._GetFeatureValue(state, "confidence")
+
+      assert.is_equal(0.8, value)
+    end)
+
+    it("retrieves value from history layer", function()
+      local state = {task = {}, self = {}, history = {prev_action = "REASON"}}
+
+      local value = M._GetFeatureValue(state, "prev_action")
+
+      assert.is_equal("REASON", value)
+    end)
+
+    it("returns nil for missing feature", function()
+      local state = {task = {}, self = {}}
+
+      local value = M._GetFeatureValue(state, "missing")
+
+      assert.is_nil(value)
+    end)
+
+    it("prioritizes task over self over history", function()
+      local state = {
+        task = {priority = "task"},
+        self = {priority = "self"},
+        history = {priority = "history"}
+      }
+
+      local value = M._GetFeatureValue(state, "priority")
+
+      assert.is_equal("task", value)
+    end)
+  end)
+end)

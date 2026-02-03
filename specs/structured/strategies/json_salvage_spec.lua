@@ -360,4 +360,239 @@ describe("JSON Salvage Strategy", function()
     end)
   end)
 
+  describe("Private Functions", function()
+    describe("_extract_json_blocks", function()
+      it("should extract direct JSON objects", function()
+        local text = 'Some text {"key": "value"} more text'
+        local blocks = JsonSalvage._extract_json_blocks(text)
+
+        assert.is_truthy(#blocks > 0)
+        assert.is_truthy(blocks[1].text:find('{"key": "value"}'))
+        assert.is.equal("direct", blocks[1].method)
+      end)
+
+      it("should extract direct JSON arrays", function()
+        local text = 'Array: [1, 2, 3]'
+        local blocks = JsonSalvage._extract_json_blocks(text)
+
+        assert.is_truthy(#blocks > 0)
+        assert.is.truthy(blocks[1].text:find("[1, 2, 3]"))
+      end)
+
+      it("should extract markdown code blocks", function()
+        local text = '```json\n{"name": "Alice"}\n```'
+        local blocks = JsonSalvage._extract_json_blocks(text)
+
+        assert.is_truthy(#blocks > 0)
+      end)
+
+      it("should extract unmarked code blocks", function()
+        local text = '{"status": "active"}'
+        local blocks = JsonSalvage._extract_json_blocks(text)
+
+        assert.is_truthy(#blocks > 0)
+      end)
+    end)
+
+    describe("_extract_braced_blocks", function()
+      it("should extract objects with braces", function()
+        local text = 'before {"a": 1} after'
+        local blocks = JsonSalvage._extract_braced_blocks(text, "{", "}")
+
+        assert.is.equal(1, #blocks)
+        assert.is.equal('{"a": 1}', blocks[1])
+      end)
+
+      it("should extract arrays with brackets", function()
+        local text = 'before [1, 2] after'
+        local blocks = JsonSalvage._extract_braced_blocks(text, "%[", "%]")
+
+        assert.is.equal(1, #blocks)
+        assert.is.equal('[1, 2]', blocks[1])
+      end)
+
+      it("should handle nested braces", function()
+        local text = '{"outer": {"inner": "value"}}'
+        local blocks = JsonSalvage._extract_braced_blocks(text, "{", "}")
+
+        assert.is.equal(1, #blocks)
+      end)
+    end)
+
+    describe("_extract_markdown_blocks", function()
+      it("should extract ```json blocks", function()
+        local text = '```json\n{"key": "value"}\n```'
+        local blocks = JsonSalvage._extract_markdown_blocks(text)
+
+        assert.is.equal(1, #blocks)
+        assert.is.truthy(blocks[1]:find('{"key": "value"}'))
+      end)
+
+      it("should extract ``` blocks without language", function()
+        local text = '```\n{"key": "value"}\n```'
+        local blocks = JsonSalvage._extract_markdown_blocks(text)
+
+        assert.is.equal(1, #blocks)
+      end)
+    end)
+
+    describe("_extract_unmarked_code_blocks", function()
+      it("should extract lines starting with {", function()
+        local text = '{"key": "value"}'
+        local blocks = JsonSalvage._extract_unmarked_code_blocks(text)
+
+        assert.is.equal(1, #blocks)
+      end)
+
+      it("should extract lines starting with [", function()
+        local text = '[1, 2, 3]'
+        local blocks = JsonSalvage._extract_unmarked_code_blocks(text)
+
+        assert.is.equal(1, #blocks)
+      end)
+
+      it("should ignore non-JSON lines", function()
+        local text = 'just text\n{"key": "value"}'
+        local blocks = JsonSalvage._extract_unmarked_code_blocks(text)
+
+        assert.is.equal(1, #blocks)
+      end)
+    end)
+
+    describe("_filter_by_type", function()
+      it("should filter to object type", function()
+        local blocks = {
+          {text = '{"a": 1}'},
+          {text = '[1, 2, 3]'}
+        }
+        local filtered = JsonSalvage._filter_by_type(blocks, "object")
+
+        assert.is.equal(1, #filtered)
+        assert.is.equal(blocks[1], filtered[1])
+      end)
+
+      it("should filter to array type", function()
+        local blocks = {
+          {text = '{"a": 1}'},
+          {text = '[1, 2, 3]'}
+        }
+        local filtered = JsonSalvage._filter_by_type(blocks, "array")
+
+        assert.is.equal(1, #filtered)
+        assert.is.equal(blocks[2], filtered[1])
+      end)
+
+      it("should return all blocks when type is nil", function()
+        local blocks = {
+          {text = '{"a": 1}'},
+          {text = '[1, 2, 3]'}
+        }
+        local filtered = JsonSalvage._filter_by_type(blocks, nil)
+
+        assert.is.equal(2, #filtered)
+      end)
+    end)
+
+    describe("_clean_json", function()
+      it("should remove markdown fences", function()
+        local json = '```json\n{"key": "value"}\n```'
+        local cleaned = JsonSalvage._clean_json(json)
+
+        assert.is.falsy(cleaned:find("```"))
+      end)
+
+      it("should remove JSON: prefix", function()
+        local json = 'JSON: {"key": "value"}'
+        local cleaned = JsonSalvage._clean_json(json)
+
+        assert.is.falsy(cleaned:find("JSON:"))
+      end)
+
+      it("should remove Result: prefix", function()
+        local json = 'Result: {"key": "value"}'
+        local cleaned = JsonSalvage._clean_json(json)
+
+        assert.is.falsy(cleaned:find("Result:"))
+      end)
+    end)
+
+    describe("_apply_safe_repairs", function()
+      it("should return data as-is", function()
+        local data = {key = "value"}
+        local repaired = JsonSalvage._apply_safe_repairs(data)
+
+        assert.is.equal(data, repaired)
+      end)
+    end)
+
+    describe("_detect_repairs_needed", function()
+      it("should detect when cleaning occurred", function()
+        local repairs = JsonSalvage._detect_repairs_needed('```json\n{"key": "value"}', '{"key": "value"}')
+
+        assert.is.truthy(#repairs > 0)
+        assert.is.equal("cleaned", repairs[1])
+      end)
+
+      it("should return empty table when no repairs", function()
+        local repairs = JsonSalvage._detect_repairs_needed('{"key": "value"}', '{"key": "value"}')
+
+        assert.is.equal(0, #repairs)
+      end)
+    end)
+
+    describe("_parse_json", function()
+      it("should parse valid JSON", function()
+        local data, err = JsonSalvage._parse_json('{"key": "value"}')
+
+        assert.is_not_nil(data)
+        assert.is.equal("value", data.key)
+        assert.is_nil(err)
+      end)
+
+      it("should parse JSON arrays", function()
+        local data, err = JsonSalvage._parse_json('[1, 2, 3]')
+
+        assert.is_not_nil(data)
+        assert.is.equal(1, data[1])
+        assert.is_nil(err)
+      end)
+
+      it("should return nil for invalid JSON", function()
+        local data, err = JsonSalvage._parse_json('{invalid}')
+
+        assert.is_nil(data)
+        assert.is_not_nil(err)
+      end)
+
+      it("should return nil for empty string", function()
+        local data, err = JsonSalvage._parse_json("")
+
+        assert.is_nil(data)
+        assert.is_not_nil(err)
+      end)
+    end)
+
+    describe("is_json_text", function()
+      it("should return true for object", function()
+        assert.is_true(JsonSalvage.is_json_text('{"key": "value"}'))
+      end)
+
+      it("should return true for array", function()
+        assert.is_true(JsonSalvage.is_json_text('[1, 2, 3]'))
+      end)
+
+      it("should return false for plain text", function()
+        assert.is_false(JsonSalvage.is_json_text('just text'))
+      end)
+
+      it("should return false for empty string", function()
+        assert.is_false(JsonSalvage.is_json_text(''))
+      end)
+
+      it("should handle whitespace", function()
+        assert.is_true(JsonSalvage.is_json_text('  {"key": "value"}  '))
+      end)
+    end)
+  end)
+
 end)

@@ -436,6 +436,28 @@ describe("ACE Threshold Learning", function()
       assert.is_not_nil(metrics.false_positives)
     end)
 
+    it("_computeUtilization should calculate match rate", function()
+      local data = {
+        {salience = 0.8},
+        {salience = 0.6},
+        {salience = 0.4},
+        {salience = 0.9}
+      }
+
+      -- With threshold 0.5, 3 out of 4 match
+      local utilization = Threshold._computeUtilization(data, 0.5)
+
+      assert.is_equal(0.75, utilization)
+    end)
+
+    it("_computeUtilization should return 0 for empty data", function()
+      local data = {}
+
+      local utilization = Threshold._computeUtilization(data, 0.5)
+
+      assert.is_equal(0, utilization)
+    end)
+
   end)
 
 end)
