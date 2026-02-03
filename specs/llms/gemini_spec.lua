@@ -2,14 +2,14 @@ describe("Gemini Provider", function()
     local llms = require("dslua.llms")
 
     it("should create Gemini provider", function()
-        local llm = llms.Gemini("test-key", "gemini-pro")
+        local llm = llms.Gemini("test-key", "gemini-2.5-pro")
 
         assert.is.equal("test-key", llm:APIKey())
-        assert.is.equal("gemini-pro", llm:Model())
+        assert.is.equal("gemini-2.5-pro", llm:Model())
     end)
 
     it("should build Gemini request body", function()
-        local llm = llms.Gemini("test-key", "gemini-pro")
+        local llm = llms.Gemini("test-key", "gemini-2.5-flash")
 
         local body = llm:_buildRequestBody("Hello", {})
 
@@ -25,7 +25,7 @@ describe("Gemini Provider", function()
             return
         end
 
-        local llm = llms.Gemini(api_key, "gemini-pro")
+        local llm = llms.Gemini(api_key, "gemini-2.5-flash")
         local ctx = require("dslua.core.context").new()
 
         local result = llm:Complete(ctx, "Say 'test'")
