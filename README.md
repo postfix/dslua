@@ -2,7 +2,7 @@
 
 **DSPy for LuaJIT 2.1+** - Systematic prompt engineering with compiled performance.
 
-[![Tests](https://img.shields.io/badge/tests-1022%20passing-brightgreen)](https://github.com/postfix/dslua)
+[![Tests](https://img.shields.io/badge/tests-1289%20passing-brightgreen)](https://github.com/postfix/dslua)
 [![Parity](https://img.shields.io/badge/parity-DSPy--Go~100%25-brightgreen)](https://github.com/postfix/dslua)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -292,7 +292,7 @@ busted specs/agents/
 busted --verbose
 ```
 
-**Test Coverage:** 1022 tests passing (0 failures, 0 errors, 5 API-key dependent)
+**Test Coverage:** 1289 tests passing (0 failures, 2 errors, 2 pending, 2 API-key dependent)
 
 ---
 
